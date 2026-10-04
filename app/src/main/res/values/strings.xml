@@ -1,4 +1,3 @@
-<resources>
-    <string name="app_name">RideClick</string>
-    <string name="accessibility_service_description">RideClick يراقب نصوص الطلبات في التطبيقات التي يختارها المستخدم ويعرض قرار الفلترة. النسخة الحالية للقراءة والمراقبة فقط.</string>
-</resources>
+<string name="accessibility_service_description">
+RideClick يستخدم خدمة الوصول لقراءة معلومات الطلبات وتطبيق الفلاتر المحددة.
+</string>

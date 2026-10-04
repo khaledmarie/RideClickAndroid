@@ -2,6 +2,7 @@ package com.rideclick.app
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -48,30 +49,44 @@ fun RideClickApp() {
     val context = LocalContext.current
 
     val prefs = remember {
-        context.getSharedPreferences("rideclick_settings", Context.MODE_PRIVATE)
+        context.getSharedPreferences(
+            "rideclick_settings",
+            Context.MODE_PRIVATE
+        )
     }
 
     var enabled by remember {
-        mutableStateOf(prefs.getBoolean("enabled", false))
+        mutableStateOf(
+            prefs.getBoolean("enabled", false)
+        )
     }
 
     var jeenyEnabled by remember {
-        mutableStateOf(prefs.getBoolean("jeeny", true))
+        mutableStateOf(
+            prefs.getBoolean("jeeny", true)
+        )
     }
 
     var petraEnabled by remember {
-        mutableStateOf(prefs.getBoolean("petra", true))
+        mutableStateOf(
+            prefs.getBoolean("petra", true)
+        )
     }
 
     var minPrice by remember {
-        mutableStateOf(prefs.getString("min_price", "4.00") ?: "4.00")
+        mutableStateOf(
+            prefs.getString("min_price", "4.00") ?: "4.00"
+        )
     }
 
     var maxTime by remember {
-        mutableStateOf(prefs.getString("max_time", "5") ?: "5")
+        mutableStateOf(
+            prefs.getString("max_time", "5") ?: "5"
+        )
     }
 
     fun saveSettings() {
+
         prefs.edit()
             .putBoolean("enabled", enabled)
             .putBoolean("jeeny", jeenyEnabled)
@@ -79,6 +94,28 @@ fun RideClickApp() {
             .putString("min_price", minPrice)
             .putString("max_time", maxTime)
             .apply()
+    }
+
+    fun openOverlaySettings() {
+
+        if (!Settings.canDrawOverlays(context)) {
+
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:${context.packageName}")
+            )
+
+            context.startActivity(intent)
+
+        } else {
+
+            val intent = Intent(
+                context,
+                RideClickOverlayService::class.java
+            )
+
+            context.startService(intent)
+        }
     }
 
     CompositionLocalProvider(
@@ -91,7 +128,9 @@ fun RideClickApp() {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(20.dp),
+
                 verticalArrangement = Arrangement.Top,
+
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
@@ -101,21 +140,27 @@ fun RideClickApp() {
                     style = MaterialTheme.typography.headlineMedium
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
 
                 Text(
                     text = if (enabled)
                         "جاهز لاستقبال الطلبات"
                     else
                         "متوقف",
+
                     fontSize = 20.sp,
+
                     color = if (enabled)
                         MaterialTheme.colorScheme.primary
                     else
                         MaterialTheme.colorScheme.error
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(
+                    modifier = Modifier.height(20.dp)
+                )
 
                 Card(
                     modifier = Modifier.fillMaxWidth()
@@ -125,8 +170,12 @@ fun RideClickApp() {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+
+                        horizontalArrangement =
+                            Arrangement.SpaceBetween,
+
+                        verticalAlignment =
+                            Alignment.CenterVertically
                     ) {
 
                         Text(
@@ -134,20 +183,30 @@ fun RideClickApp() {
                                 "RideClick يعمل"
                             else
                                 "RideClick متوقف",
+
                             fontSize = 18.sp
                         )
 
                         Switch(
                             checked = enabled,
+
                             onCheckedChange = {
+
                                 enabled = it
+
                                 saveSettings()
+
+                                if (enabled) {
+                                    openOverlaySettings()
+                                }
                             }
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(
+                    modifier = Modifier.height(20.dp)
+                )
 
                 Text(
                     text = "الخدمات المدعومة",
@@ -155,7 +214,9 @@ fun RideClickApp() {
                     style = MaterialTheme.typography.titleLarge
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
 
                 Card(
                     modifier = Modifier.fillMaxWidth()
@@ -167,8 +228,12 @@ fun RideClickApp() {
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+
+                            horizontalArrangement =
+                                Arrangement.SpaceBetween,
+
+                            verticalAlignment =
+                                Alignment.CenterVertically
                         ) {
 
                             Text(
@@ -178,8 +243,11 @@ fun RideClickApp() {
 
                             Switch(
                                 checked = jeenyEnabled,
+
                                 onCheckedChange = {
+
                                     jeenyEnabled = it
+
                                     saveSettings()
                                 }
                             )
@@ -189,8 +257,12 @@ fun RideClickApp() {
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+
+                            horizontalArrangement =
+                                Arrangement.SpaceBetween,
+
+                            verticalAlignment =
+                                Alignment.CenterVertically
                         ) {
 
                             Text(
@@ -200,8 +272,11 @@ fun RideClickApp() {
 
                             Switch(
                                 checked = petraEnabled,
+
                                 onCheckedChange = {
+
                                     petraEnabled = it
+
                                     saveSettings()
                                 }
                             )
@@ -209,7 +284,9 @@ fun RideClickApp() {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(
+                    modifier = Modifier.height(20.dp)
+                )
 
                 Text(
                     text = "فلاتر الطلبات",
@@ -217,63 +294,99 @@ fun RideClickApp() {
                     style = MaterialTheme.typography.titleLarge
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
 
                 OutlinedTextField(
                     value = minPrice,
+
                     onValueChange = {
                         minPrice = it
                     },
+
                     modifier = Modifier.fillMaxWidth(),
+
                     label = {
                         Text("الحد الأدنى للسعر")
                     },
+
                     singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(
+                    modifier = Modifier.height(12.dp)
+                )
 
                 OutlinedTextField(
                     value = maxTime,
+
                     onValueChange = {
                         maxTime = it
                     },
+
                     modifier = Modifier.fillMaxWidth(),
+
                     label = {
                         Text("أقصى وقت للطلب بالدقائق")
                     },
+
                     singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(
+                    modifier = Modifier.height(20.dp)
+                )
 
                 Button(
                     onClick = {
                         saveSettings()
                     },
+
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("حفظ الإعدادات")
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
 
                 TextButton(
                     onClick = {
-                        val intent =
-                            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+
+                        val intent = Intent(
+                            Settings.ACTION_ACCESSIBILITY_SETTINGS
+                        )
 
                         context.startActivity(intent)
                     }
                 ) {
-                    Text("تفعيل خدمة Accessibility")
+                    Text("تفعيل Accessibility")
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
+
+                Button(
+                    onClick = {
+                        openOverlaySettings()
+                    },
+
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("تشغيل الفقاعة العائمة")
+                }
+
+                Spacer(
+                    modifier = Modifier.height(12.dp)
+                )
 
                 Text(
                     text =
                         "السعر ≥ $minPrice د.أ  •  الوقت ≤ $maxTime دقائق",
+
                     fontSize = 14.sp
                 )
             }

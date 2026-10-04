@@ -1,5 +1,6 @@
 package com.rideclick.app
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -24,6 +25,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -35,30 +37,56 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            RideClickApp(
-                onOpenAccessibilitySettings = {
-                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                    startActivity(intent)
-                }
-            )
+            RideClickApp()
         }
     }
 }
 
 @Composable
-fun RideClickApp(
-    onOpenAccessibilitySettings: () -> Unit
-) {
-    var enabled by remember { mutableStateOf(false) }
-    var jeenyEnabled by remember { mutableStateOf(true) }
-    var petraEnabled by remember { mutableStateOf(true) }
-    var minPrice by remember { mutableStateOf("4.00") }
-    var maxTime by remember { mutableStateOf("5") }
+fun RideClickApp() {
+
+    val context = LocalContext.current
+
+    val prefs = remember {
+        context.getSharedPreferences("rideclick_settings", Context.MODE_PRIVATE)
+    }
+
+    var enabled by remember {
+        mutableStateOf(prefs.getBoolean("enabled", false))
+    }
+
+    var jeenyEnabled by remember {
+        mutableStateOf(prefs.getBoolean("jeeny", true))
+    }
+
+    var petraEnabled by remember {
+        mutableStateOf(prefs.getBoolean("petra", true))
+    }
+
+    var minPrice by remember {
+        mutableStateOf(prefs.getString("min_price", "4.00") ?: "4.00")
+    }
+
+    var maxTime by remember {
+        mutableStateOf(prefs.getString("max_time", "5") ?: "5")
+    }
+
+    fun saveSettings() {
+        prefs.edit()
+            .putBoolean("enabled", enabled)
+            .putBoolean("jeeny", jeenyEnabled)
+            .putBoolean("petra", petraEnabled)
+            .putString("min_price", minPrice)
+            .putString("max_time", maxTime)
+            .apply()
+    }
 
     CompositionLocalProvider(
         LocalLayoutDirection provides LayoutDirection.Rtl
     ) {
+
         MaterialTheme {
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -81,7 +109,10 @@ fun RideClickApp(
                     else
                         "متوقف",
                     fontSize = 20.sp,
-                    color = MaterialTheme.colorScheme.primary
+                    color = if (enabled)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.error
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -89,6 +120,7 @@ fun RideClickApp(
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -96,8 +128,12 @@ fun RideClickApp(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+
                         Text(
-                            text = if (enabled) "تشغيل" else "إيقاف",
+                            text = if (enabled)
+                                "RideClick يعمل"
+                            else
+                                "RideClick متوقف",
                             fontSize = 18.sp
                         )
 
@@ -105,6 +141,7 @@ fun RideClickApp(
                             checked = enabled,
                             onCheckedChange = {
                                 enabled = it
+                                saveSettings()
                             }
                         )
                     }
@@ -123,6 +160,7 @@ fun RideClickApp(
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
+
                     Column(
                         modifier = Modifier.padding(12.dp)
                     ) {
@@ -132,6 +170,7 @@ fun RideClickApp(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+
                             Text(
                                 text = "جيني — Jeeny",
                                 fontSize = 17.sp
@@ -141,6 +180,7 @@ fun RideClickApp(
                                 checked = jeenyEnabled,
                                 onCheckedChange = {
                                     jeenyEnabled = it
+                                    saveSettings()
                                 }
                             )
                         }
@@ -152,6 +192,7 @@ fun RideClickApp(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+
                             Text(
                                 text = "بترا رايد — Petra Ride",
                                 fontSize = 17.sp
@@ -161,6 +202,7 @@ fun RideClickApp(
                                 checked = petraEnabled,
                                 onCheckedChange = {
                                     petraEnabled = it
+                                    saveSettings()
                                 }
                             )
                         }
@@ -207,7 +249,7 @@ fun RideClickApp(
 
                 Button(
                     onClick = {
-                        // سيتم ربط الحفظ لاحقًا بالتخزين المحلي
+                        saveSettings()
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -217,15 +259,21 @@ fun RideClickApp(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 TextButton(
-                    onClick = onOpenAccessibilitySettings
+                    onClick = {
+                        val intent =
+                            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+
+                        context.startActivity(intent)
+                    }
                 ) {
-                    Text("إعداد خدمة الوصول Accessibility")
+                    Text("تفعيل خدمة Accessibility")
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "الإعداد الحالي: السعر ≥ $minPrice د.أ  •  الوقت ≤ $maxTime دقائق",
+                    text =
+                        "السعر ≥ $minPrice د.أ  •  الوقت ≤ $maxTime دقائق",
                     fontSize = 14.sp
                 )
             }

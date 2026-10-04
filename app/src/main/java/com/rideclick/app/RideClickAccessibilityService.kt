@@ -3,6 +3,7 @@ package com.rideclick.app
 import android.app.Service
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.IBinder
 import android.view.Gravity
@@ -30,6 +31,10 @@ class RideClickOverlayService : Service() {
 
     private fun showBubble() {
 
+        removeCurrentView()
+
+        expanded = false
+
         val bubble = TextView(this)
 
         bubble.text = "🟢 RideClick"
@@ -45,6 +50,7 @@ class RideClickOverlayService : Service() {
         bubble.background = background
 
         bubble.setOnClickListener {
+
             if (expanded) {
                 showBubble()
             } else {
@@ -52,9 +58,10 @@ class RideClickOverlayService : Service() {
             }
         }
 
-        val params = createLayoutParams()
-
-        windowManager.addView(bubble, params)
+        windowManager.addView(
+            bubble,
+            createLayoutParams()
+        )
 
         overlayView = bubble
     }
@@ -63,18 +70,20 @@ class RideClickOverlayService : Service() {
 
         removeCurrentView()
 
+        expanded = true
+
         val panel = LinearLayout(this)
 
         panel.orientation = LinearLayout.VERTICAL
         panel.setPadding(24, 20, 24, 20)
 
         val background = GradientDrawable()
-
         background.setColor(Color.rgb(30, 30, 30))
         background.cornerRadius = 30f
 
         panel.background = background
 
+        // العنوان
         val title = TextView(this)
 
         title.text = "🟢 RideClick"
@@ -83,11 +92,12 @@ class RideClickOverlayService : Service() {
 
         panel.addView(title)
 
+        // الحالة
         val status = TextView(this)
 
         status.text = "جاهز لاستقبال الطلبات"
         status.textSize = 16f
-        status.setTextColor(Color.WHITE)
+        status.setTextColor(Color.GREEN)
 
         val statusParams =
             LinearLayout.LayoutParams(
@@ -99,6 +109,7 @@ class RideClickOverlayService : Service() {
 
         panel.addView(status, statusParams)
 
+        // الفلاتر
         val filters = TextView(this)
 
         filters.text =
@@ -117,6 +128,7 @@ class RideClickOverlayService : Service() {
 
         panel.addView(filters, filterParams)
 
+        // زر الإيقاف
         val stopButton = Button(this)
 
         stopButton.text = "إيقاف RideClick"
@@ -136,13 +148,12 @@ class RideClickOverlayService : Service() {
 
         panel.addView(stopButton, stopParams)
 
+        // زر التصغير
         val closeButton = Button(this)
 
         closeButton.text = "تصغير"
 
         closeButton.setOnClickListener {
-
-            expanded = false
 
             showBubble()
         }
@@ -155,13 +166,12 @@ class RideClickOverlayService : Service() {
 
         panel.addView(closeButton, closeParams)
 
-        val params = createLayoutParams()
-
-        windowManager.addView(panel, params)
+        windowManager.addView(
+            panel,
+            createLayoutParams()
+        )
 
         overlayView = panel
-
-        expanded = true
     }
 
     private fun createLayoutParams(): WindowManager.LayoutParams {
@@ -174,11 +184,10 @@ class RideClickOverlayService : Service() {
 
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
 
-            android.graphics.PixelFormat.TRANSLUCENT
+            PixelFormat.TRANSLUCENT
         ).apply {
 
-            gravity =
-                Gravity.TOP or Gravity.END
+            gravity = Gravity.TOP or Gravity.END
 
             x = 20
             y = 120

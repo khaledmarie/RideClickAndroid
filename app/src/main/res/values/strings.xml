@@ -1,3 +1,11 @@
-<string name="accessibility_service_description">
-RideClick يستخدم خدمة الوصول لقراءة معلومات الطلبات وتطبيق الفلاتر المحددة.
-</string>
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources>
+
+    <string name="app_name">RideClick</string>
+
+    <string name="accessibility_service_description">
+        RideClick يستخدم خدمة الوصول لقراءة معلومات الطلبات وتطبيق الفلاتر المحددة.
+    </string>
+
+</resources>

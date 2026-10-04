@@ -232,9 +232,3 @@ fun RideClickApp(
         }
     }
 }
-        label = { Text(label) },
-        suffix = { Text(suffix) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth()
-    )
-}

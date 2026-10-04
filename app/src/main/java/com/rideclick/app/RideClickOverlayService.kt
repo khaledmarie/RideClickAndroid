@@ -18,7 +18,6 @@ class RideClickOverlayService : Service() {
     private lateinit var windowManager: WindowManager
 
     private var overlayView: View? = null
-    private var expanded = false
 
     override fun onCreate() {
         super.onCreate()
@@ -33,15 +32,19 @@ class RideClickOverlayService : Service() {
 
         removeCurrentView()
 
-        expanded = false
-
         val bubble = TextView(this)
 
         bubble.text = "🟢 RideClick"
         bubble.textSize = 16f
         bubble.setTextColor(Color.WHITE)
         bubble.gravity = Gravity.CENTER
-        bubble.setPadding(30, 18, 30, 18)
+
+        bubble.setPadding(
+            30,
+            18,
+            30,
+            18
+        )
 
         val background = GradientDrawable()
         background.setColor(Color.rgb(30, 30, 30))
@@ -50,26 +53,36 @@ class RideClickOverlayService : Service() {
         bubble.background = background
 
         bubble.setOnClickListener {
-            showPanel()
+            showPanel(bubble)
         }
 
-        val params = createLayoutParams()
-
-        windowManager.addView(bubble, params)
+        windowManager.addView(
+            bubble,
+            createLayoutParams()
+        )
 
         overlayView = bubble
     }
 
-    private fun showPanel() {
+    private fun showPanel(oldBubble: View) {
 
-        // أولاً نبني اللوحة
         val panel = LinearLayout(this)
 
         panel.orientation = LinearLayout.VERTICAL
-        panel.setPadding(30, 25, 30, 25)
+
+        panel.setPadding(
+            30,
+            25,
+            30,
+            25
+        )
 
         val background = GradientDrawable()
-        background.setColor(Color.rgb(30, 30, 30))
+
+        background.setColor(
+            Color.rgb(30, 30, 30)
+        )
+
         background.cornerRadius = 30f
 
         panel.background = background
@@ -98,7 +111,10 @@ class RideClickOverlayService : Service() {
 
         statusParams.topMargin = 15
 
-        panel.addView(status, statusParams)
+        panel.addView(
+            status,
+            statusParams
+        )
 
         // الخدمات
         val services = TextView(this)
@@ -109,15 +125,18 @@ class RideClickOverlayService : Service() {
         services.textSize = 15f
         services.setTextColor(Color.WHITE)
 
-        val serviceParams =
+        val servicesParams =
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
 
-        serviceParams.topMargin = 15
+        servicesParams.topMargin = 15
 
-        panel.addView(services, serviceParams)
+        panel.addView(
+            services,
+            servicesParams
+        )
 
         // الفلاتر
         val filters = TextView(this)
@@ -128,15 +147,18 @@ class RideClickOverlayService : Service() {
         filters.textSize = 15f
         filters.setTextColor(Color.LTGRAY)
 
-        val filterParams =
+        val filtersParams =
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
 
-        filterParams.topMargin = 15
+        filtersParams.topMargin = 15
 
-        panel.addView(filters, filterParams)
+        panel.addView(
+            filters,
+            filtersParams
+        )
 
         // زر الإيقاف
         val stopButton = Button(this)
@@ -155,7 +177,10 @@ class RideClickOverlayService : Service() {
 
         stopParams.topMargin = 15
 
-        panel.addView(stopButton, stopParams)
+        panel.addView(
+            stopButton,
+            stopParams
+        )
 
         // زر التصغير
         val minimizeButton = Button(this)
@@ -172,34 +197,46 @@ class RideClickOverlayService : Service() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
 
-        minimizeParams.topMargin = 5
+        panel.addView(
+            minimizeButton,
+            minimizeParams
+        )
 
-        panel.addView(minimizeButton, minimizeParams)
-
-        // نضيف اللوحة أولاً
+        // نضيف اللوحة
         windowManager.addView(
             panel,
             createLayoutParams()
         )
 
-        // بعدها نحذف الفقاعة القديمة
-        removeCurrentViewExcept(panel)
+        // نحذف الفقاعة القديمة
+        try {
+            windowManager.removeView(oldBubble)
+        } catch (_: Exception) {
+        }
 
+        // الآن اللوحة هي الـ View الحالية
         overlayView = panel
-        expanded = true
     }
 
-    private fun createLayoutParams(): WindowManager.LayoutParams {
+    private fun createLayoutParams():
+            WindowManager.LayoutParams {
 
         return WindowManager.LayoutParams(
+
             WindowManager.LayoutParams.WRAP_CONTENT,
+
             WindowManager.LayoutParams.WRAP_CONTENT,
+
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+
             PixelFormat.TRANSLUCENT
+
         ).apply {
 
-            gravity = Gravity.TOP or Gravity.END
+            gravity =
+                Gravity.TOP or Gravity.END
 
             x = 20
             y = 120
@@ -219,22 +256,6 @@ class RideClickOverlayService : Service() {
         overlayView = null
     }
 
-    private fun removeCurrentViewExcept(viewToKeep: View) {
-
-        overlayView?.let {
-
-            if (it != viewToKeep) {
-
-                try {
-                    windowManager.removeView(it)
-                } catch (_: Exception) {
-                }
-            }
-        }
-
-        overlayView = null
-    }
-
     override fun onDestroy() {
 
         removeCurrentView()
@@ -242,7 +263,9 @@ class RideClickOverlayService : Service() {
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
+    override fun onBind(
+        intent: Intent?
+    ): IBinder? {
 
         return null
     }

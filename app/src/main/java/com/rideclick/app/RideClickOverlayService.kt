@@ -7,11 +7,13 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.IBinder
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import kotlin.math.abs
 
 class RideClickOverlayService : Service() {
 
@@ -19,212 +21,157 @@ class RideClickOverlayService : Service() {
 
     private var overlayView: View? = null
 
+    // موقع الفقاعة
+    private var bubbleX = 20
+    private var bubbleY = 120
+
+    // بيانات السحب
+    private var initialX = 0
+    private var initialY = 0
+    private var initialTouchX = 0f
+    private var initialTouchY = 0f
+
+    private var isDragging = false
+
     override fun onCreate() {
         super.onCreate()
 
-        windowManager =
-            getSystemService(WINDOW_SERVICE) as WindowManager
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
         showBubble()
     }
 
+    // =========================================================
+    // إنشاء الفقاعة
+    // =========================================================
+
     private fun showBubble() {
 
-        removeCurrentView()
+        // إزالة أي View موجود
+        overlayView?.let {
+            try {
+                windowManager.removeView(it)
+            } catch (_: Exception) {
+            }
+        }
 
         val bubble = TextView(this)
 
         bubble.text = "🟢 RideClick"
-        bubble.textSize = 16f
+        bubble.textSize = 14f
         bubble.setTextColor(Color.WHITE)
         bubble.gravity = Gravity.CENTER
-
-        bubble.setPadding(
-            30,
-            18,
-            30,
-            18
-        )
+        bubble.setPadding(20, 12, 20, 12)
 
         val background = GradientDrawable()
         background.setColor(Color.rgb(30, 30, 30))
-        background.cornerRadius = 60f
+        background.cornerRadius = 100f
+        background.setStroke(2, Color.rgb(0, 200, 80))
 
         bubble.background = background
 
-        bubble.setOnClickListener {
-            showPanel(bubble)
+        val params = createLayoutParams()
+
+        // =====================================================
+        // التحكم بالسحب والضغط
+        // =====================================================
+
+        bubble.setOnTouchListener { view, event ->
+
+            when (event.actionMasked) {
+
+                MotionEvent.ACTION_DOWN -> {
+
+                    initialX = params.x
+                    initialY = params.y
+
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+
+                    isDragging = false
+
+                    true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+
+                    val dx = event.rawX - initialTouchX
+                    val dy = event.rawY - initialTouchY
+
+                    // إذا تحركت أكثر من 10 بكسل نعتبرها عملية سحب
+                    if (abs(dx) > 10 || abs(dy) > 10) {
+                        isDragging = true
+                    }
+
+                    if (isDragging) {
+
+                        // لأن Gravity = END
+                        // زيادة حركة الإصبع لليمين تعني تقليل x
+                        params.x = initialX - dx.toInt()
+                        params.y = initialY + dy.toInt()
+
+                        // منع الفقاعة من الخروج بعيدًا عن الشاشة
+                        if (params.x < 0) {
+                            params.x = 0
+                        }
+
+                        if (params.y < 0) {
+                            params.y = 0
+                        }
+
+                        try {
+                            windowManager.updateViewLayout(
+                                view,
+                                params
+                            )
+                        } catch (_: Exception) {
+                        }
+                    }
+
+                    true
+                }
+
+                MotionEvent.ACTION_UP -> {
+
+                    if (!isDragging) {
+
+                        // ضغطة عادية
+                        showPanel(view)
+
+                    } else {
+
+                        // انتهى السحب
+                        bubbleX = params.x
+                        bubbleY = params.y
+                    }
+
+                    true
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+
+                    isDragging = false
+
+                    true
+                }
+
+                else -> true
+            }
         }
 
-        windowManager.addView(
-            bubble,
-            createLayoutParams()
-        )
+        windowManager.addView(bubble, params)
 
         overlayView = bubble
     }
 
-    private fun showPanel(oldBubble: View) {
+    // =========================================================
+    // إنشاء إعدادات الفقاعة
+    // =========================================================
 
-        val panel = LinearLayout(this)
-
-        panel.orientation = LinearLayout.VERTICAL
-
-        panel.setPadding(
-            30,
-            25,
-            30,
-            25
-        )
-
-        val background = GradientDrawable()
-
-        background.setColor(
-            Color.rgb(30, 30, 30)
-        )
-
-        background.cornerRadius = 30f
-
-        panel.background = background
-
-        // العنوان
-        val title = TextView(this)
-
-        title.text = "🟢 RideClick"
-        title.textSize = 22f
-        title.setTextColor(Color.WHITE)
-
-        panel.addView(title)
-
-        // الحالة
-        val status = TextView(this)
-
-        status.text = "● جاهز لاستقبال الطلبات"
-        status.textSize = 16f
-        status.setTextColor(Color.GREEN)
-
-        val statusParams =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-
-        statusParams.topMargin = 15
-
-        panel.addView(
-            status,
-            statusParams
-        )
-
-        // الخدمات
-        val services = TextView(this)
-
-        services.text =
-            "الخدمات:\nجيني\nبترا رايد"
-
-        services.textSize = 15f
-        services.setTextColor(Color.WHITE)
-
-        val servicesParams =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-
-        servicesParams.topMargin = 15
-
-        panel.addView(
-            services,
-            servicesParams
-        )
-
-        // الفلاتر
-        val filters = TextView(this)
-
-        filters.text =
-            "الفلاتر:\nالسعر ≥ 4.00 د.أ\nالوقت ≤ 5 دقائق"
-
-        filters.textSize = 15f
-        filters.setTextColor(Color.LTGRAY)
-
-        val filtersParams =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-
-        filtersParams.topMargin = 15
-
-        panel.addView(
-            filters,
-            filtersParams
-        )
-
-        // زر الإيقاف
-        val stopButton = Button(this)
-
-        stopButton.text = "إيقاف RideClick"
-
-        stopButton.setOnClickListener {
-            stopSelf()
-        }
-
-        val stopParams =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-
-        stopParams.topMargin = 15
-
-        panel.addView(
-            stopButton,
-            stopParams
-        )
-
-        // زر التصغير
-        val minimizeButton = Button(this)
-
-        minimizeButton.text = "تصغير"
-
-        minimizeButton.setOnClickListener {
-            showBubble()
-        }
-
-        val minimizeParams =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-
-        panel.addView(
-            minimizeButton,
-            minimizeParams
-        )
-
-        // نضيف اللوحة
-        windowManager.addView(
-            panel,
-            createLayoutParams()
-        )
-
-        // نحذف الفقاعة القديمة
-        try {
-            windowManager.removeView(oldBubble)
-        } catch (_: Exception) {
-        }
-
-        // الآن اللوحة هي الـ View الحالية
-        overlayView = panel
-    }
-
-    private fun createLayoutParams():
-            WindowManager.LayoutParams {
+    private fun createLayoutParams(): WindowManager.LayoutParams {
 
         return WindowManager.LayoutParams(
-
             WindowManager.LayoutParams.WRAP_CONTENT,
-
             WindowManager.LayoutParams.WRAP_CONTENT,
 
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -232,18 +179,182 @@ class RideClickOverlayService : Service() {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
 
             PixelFormat.TRANSLUCENT
-
         ).apply {
 
-            gravity =
-                Gravity.TOP or Gravity.END
+            gravity = Gravity.TOP or Gravity.END
 
-            x = 20
-            y = 120
+            x = bubbleX
+            y = bubbleY
         }
     }
 
-    private fun removeCurrentView() {
+    // =========================================================
+    // لوحة RideClick
+    // =========================================================
+
+    private fun showPanel(oldBubble: View) {
+
+        val panel = LinearLayout(this)
+
+        panel.orientation = LinearLayout.VERTICAL
+        panel.setPadding(30, 25, 30, 25)
+
+        val background = GradientDrawable()
+        background.setColor(Color.rgb(25, 25, 25))
+        background.cornerRadius = 30f
+        background.setStroke(2, Color.rgb(0, 200, 80))
+
+        panel.background = background
+
+        // -----------------------------------------------------
+        // العنوان
+        // -----------------------------------------------------
+
+        val title = TextView(this)
+
+        title.text = "🟢 RideClick"
+        title.textSize = 20f
+        title.setTextColor(Color.WHITE)
+
+        panel.addView(title)
+
+        // -----------------------------------------------------
+        // الحالة
+        // -----------------------------------------------------
+
+        val status = TextView(this)
+
+        status.text = "● جاهز لاستقبال الطلبات"
+        status.textSize = 16f
+        status.setTextColor(Color.GREEN)
+
+        val statusParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+
+        statusParams.topMargin = 15
+
+        panel.addView(status, statusParams)
+
+        // -----------------------------------------------------
+        // الخدمات
+        // -----------------------------------------------------
+
+        val services = TextView(this)
+
+        services.text = """
+🚕 الخدمات:
+
+جيني
+بترا رايد
+        """.trimIndent()
+
+        services.textSize = 15f
+        services.setTextColor(Color.WHITE)
+
+        val servicesParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+
+        servicesParams.topMargin = 15
+
+        panel.addView(services, servicesParams)
+
+        // -----------------------------------------------------
+        // الفلاتر
+        // -----------------------------------------------------
+
+        val filters = TextView(this)
+
+        filters.text = """
+⚙️ الفلاتر:
+
+السعر ≥ 4.00 د.أ
+الوقت ≤ 5 دقائق
+        """.trimIndent()
+
+        filters.textSize = 15f
+        filters.setTextColor(Color.WHITE)
+
+        val filtersParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+
+        filtersParams.topMargin = 15
+
+        panel.addView(filters, filtersParams)
+
+        // -----------------------------------------------------
+        // زر إيقاف
+        // -----------------------------------------------------
+
+        val stopButton = Button(this)
+
+        stopButton.text = "إيقاف RideClick"
+
+        stopButton.setOnClickListener {
+
+            stopSelf()
+        }
+
+        val stopParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+
+        stopParams.topMargin = 20
+
+        panel.addView(stopButton, stopParams)
+
+        // -----------------------------------------------------
+        // زر تصغير
+        // -----------------------------------------------------
+
+        val minimizeButton = Button(this)
+
+        minimizeButton.text = "تصغير"
+
+        minimizeButton.setOnClickListener {
+
+            showBubble()
+        }
+
+        val minimizeParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+
+        panel.addView(minimizeButton, minimizeParams)
+
+        // =====================================================
+        // إضافة اللوحة
+        // =====================================================
+
+        val panelParams = createLayoutParams()
+
+        try {
+
+            windowManager.addView(
+                panel,
+                panelParams
+            )
+
+            windowManager.removeView(oldBubble)
+
+            overlayView = panel
+
+        } catch (_: Exception) {
+        }
+    }
+
+    // =========================================================
+    // إيقاف الخدمة
+    // =========================================================
+
+    override fun onDestroy() {
 
         overlayView?.let {
 
@@ -254,19 +365,11 @@ class RideClickOverlayService : Service() {
         }
 
         overlayView = null
-    }
-
-    override fun onDestroy() {
-
-        removeCurrentView()
 
         super.onDestroy()
     }
 
-    override fun onBind(
-        intent: Intent?
-    ): IBinder? {
-
+    override fun onBind(intent: Intent?): IBinder? {
         return null
     }
 }

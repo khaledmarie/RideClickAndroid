@@ -23,7 +23,9 @@ class RideClickAccessibilityService : AccessibilityService() {
         const val EXTRA_MINUTES = "minutes"
         const val EXTRA_MATCHED = "matched"
 
-        // لمنع تكرار معالجة نفس الطلب بسرعة
+        // هل تم العثور على شريط قبول العرض؟
+        const val EXTRA_ACCEPT_FOUND = "accept_found"
+
         private const val OFFER_COOLDOWN = 1500L
     }
 
@@ -67,7 +69,7 @@ class RideClickAccessibilityService : AccessibilityService() {
         )
 
         // =========================
-        // هل يوجد طلب Jeeny؟
+        // اكتشاف طلب Jeeny
         // =========================
 
         val offerDetected =
@@ -85,11 +87,15 @@ class RideClickAccessibilityService : AccessibilityService() {
         }
 
         // =========================
-        // استخراج السعر والوقت
+        // استخراج السعر
         // =========================
 
         val price =
             extractPrice(texts)
+
+        // =========================
+        // استخراج الدقائق
+        // =========================
 
         val minutes =
             extractMinutes(texts)
@@ -113,7 +119,7 @@ class RideClickAccessibilityService : AccessibilityService() {
         }
 
         // =========================
-        // منع التكرار السريع
+        // منع تكرار نفس الطلب بسرعة
         // =========================
 
         val offerKey =
@@ -126,15 +132,17 @@ class RideClickAccessibilityService : AccessibilityService() {
             offerKey == lastOfferKey &&
             now - lastOfferTime < OFFER_COOLDOWN
         ) {
-
             return
         }
 
-        lastOfferKey = offerKey
-        lastOfferTime = now
+        lastOfferKey =
+            offerKey
+
+        lastOfferTime =
+            now
 
         // =========================
-        // مقارنة الشروط
+        // فحص شروط الطلب
         // =========================
 
         val matched =
@@ -150,19 +158,15 @@ class RideClickAccessibilityService : AccessibilityService() {
             }
         )
 
-        // إرسال النتيجة للـ Overlay
-        sendOfferToOverlay(
-            price,
-            minutes,
-            matched
-        )
-
         // =========================
         // البحث عن شريط قبول العرض
         // =========================
 
         val acceptNode =
             findAcceptNode(root)
+
+        val acceptFound =
+            acceptNode != null
 
         if (acceptNode != null) {
 
@@ -213,13 +217,6 @@ class RideClickAccessibilityService : AccessibilityService() {
                 "Enabled = ${acceptNode.isEnabled}"
             )
 
-            // مهم جدًا:
-            // لا يوجد ضغط ولا سحب هنا.
-            //
-            // هذه المرحلة فقط للتأكد
-            // أن RideClick يستطيع العثور
-            // على شريط "قبول العرض".
-
         } else {
 
             Log.d(
@@ -227,16 +224,28 @@ class RideClickAccessibilityService : AccessibilityService() {
                 "⚠️ ACCEPT CONTROL NOT FOUND"
             )
         }
+
+        // =========================
+        // إرسال كل النتائج للـ Overlay
+        // =========================
+
+        sendOfferToOverlay(
+            price,
+            minutes,
+            matched,
+            acceptFound
+        )
     }
 
     // =============================
-    // إرسال الطلب إلى Overlay
+    // إرسال البيانات للـ Overlay
     // =============================
 
     private fun sendOfferToOverlay(
         price: Double,
         minutes: Int,
-        matched: Boolean
+        matched: Boolean,
+        acceptFound: Boolean
     ) {
 
         val intent =
@@ -261,6 +270,11 @@ class RideClickAccessibilityService : AccessibilityService() {
                 putExtra(
                     EXTRA_MATCHED,
                     matched
+                )
+
+                putExtra(
+                    EXTRA_ACCEPT_FOUND,
+                    acceptFound
                 )
             }
 
@@ -323,7 +337,7 @@ class RideClickAccessibilityService : AccessibilityService() {
     }
 
     // =============================
-    // قراءة النصوص
+    // جمع النصوص من الشاشة
     // =============================
 
     private fun collectTexts(
@@ -344,7 +358,9 @@ class RideClickAccessibilityService : AccessibilityService() {
             !text.isNullOrEmpty()
         ) {
 
-            result.add(text)
+            result.add(
+                text
+            )
         }
 
         val description =
@@ -428,7 +444,7 @@ class RideClickAccessibilityService : AccessibilityService() {
     }
 
     // =============================
-    // استخراج الوقت
+    // استخراج الدقائق
     // =============================
 
     private fun extractMinutes(
@@ -466,10 +482,7 @@ class RideClickAccessibilityService : AccessibilityService() {
                         .groupValues[1]
                         .toIntOrNull()
 
-                if (
-                    minutes != null
-                ) {
-
+                if (minutes != null) {
                     return minutes
                 }
             }

@@ -1,395 +1,233 @@
 package com.rideclick.app
 
-import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
+
+    companion object {
+        const val PREFS_NAME = "rideclick_prefs"
+        const val KEY_MIN_PRICE = "min_price"
+        const val KEY_MAX_MINUTES = "max_minutes"
+
+        const val DEFAULT_MIN_PRICE = 4.0f
+        const val DEFAULT_MAX_MINUTES = 5
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        setContent {
-            RideClickApp()
+        val prefs = getSharedPreferences(
+            PREFS_NAME,
+            MODE_PRIVATE
+        )
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+
+            setPadding(
+                40,
+                60,
+                40,
+                40
+            )
         }
-    }
-}
 
-@Composable
-fun RideClickApp() {
+        // =========================
+        // العنوان
+        // =========================
 
-    val context = LocalContext.current
+        val title = TextView(this).apply {
+            text = "🚕 RideClick"
+            textSize = 28f
+        }
 
-    val prefs = remember {
-        context.getSharedPreferences(
-            "rideclick_settings",
-            Context.MODE_PRIVATE
+        layout.addView(title)
+
+        // =========================
+        // أقل سعر
+        // =========================
+
+        val priceLabel = TextView(this).apply {
+            text = "💰 أقل سعر للطلب (JOD)"
+            textSize = 18f
+        }
+
+        layout.addView(priceLabel)
+
+        val savedPrice = prefs.getFloat(
+            KEY_MIN_PRICE,
+            DEFAULT_MIN_PRICE
         )
-    }
 
-    var enabled by remember {
-        mutableStateOf(
-            prefs.getBoolean("enabled", false)
-        )
-    }
+        val priceInput = EditText(this).apply {
 
-    var jeenyEnabled by remember {
-        mutableStateOf(
-            prefs.getBoolean("jeeny", true)
-        )
-    }
+            inputType =
+                android.text.InputType.TYPE_CLASS_NUMBER or
+                android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
 
-    var petraEnabled by remember {
-        mutableStateOf(
-            prefs.getBoolean("petra", true)
-        )
-    }
-
-    var minPrice by remember {
-        mutableStateOf(
-            prefs.getString("min_price", "4.00") ?: "4.00"
-        )
-    }
-
-    var maxTime by remember {
-        mutableStateOf(
-            prefs.getString("max_time", "5") ?: "5"
-        )
-    }
-
-    fun saveSettings() {
-
-        prefs.edit()
-            .putBoolean("enabled", enabled)
-            .putBoolean("jeeny", jeenyEnabled)
-            .putBoolean("petra", petraEnabled)
-            .putString("min_price", minPrice)
-            .putString("max_time", maxTime)
-            .apply()
-    }
-
-    fun openOverlaySettings() {
-
-        if (!Settings.canDrawOverlays(context)) {
-
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:${context.packageName}")
+            setText(
+                savedPrice.toString()
             )
 
-            context.startActivity(intent)
+            hint = "مثال: 4.00"
+        }
 
-        } else {
+        layout.addView(priceInput)
 
-            val intent = Intent(
-                context,
-                RideClickOverlayService::class.java
+        // =========================
+        // أقصى وقت
+        // =========================
+
+        val minutesLabel = TextView(this).apply {
+            text = "⏱️ أقصى وقت للوصول (دقائق)"
+            textSize = 18f
+        }
+
+        layout.addView(minutesLabel)
+
+        val savedMinutes = prefs.getInt(
+            KEY_MAX_MINUTES,
+            DEFAULT_MAX_MINUTES
+        )
+
+        val minutesInput = EditText(this).apply {
+
+            inputType =
+                android.text.InputType.TYPE_CLASS_NUMBER
+
+            setText(
+                savedMinutes.toString()
             )
 
-            context.startService(intent)
+            hint = "مثال: 5"
         }
-    }
 
-    CompositionLocalProvider(
-        LocalLayoutDirection provides LayoutDirection.Rtl
-    ) {
+        layout.addView(minutesInput)
 
-        MaterialTheme {
+        // =========================
+        // زر حفظ الفلاتر
+        // =========================
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(20.dp),
+        val saveButton = Button(this).apply {
 
-                verticalArrangement = Arrangement.Top,
+            text = "💾 حفظ الفلاتر"
 
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            setOnClickListener {
 
-                Text(
-                    text = "RideClick",
-                    fontSize = 30.sp,
-                    style = MaterialTheme.typography.headlineMedium
-                )
+                val price =
+                    priceInput.text
+                        .toString()
+                        .replace(",", ".")
+                        .toFloatOrNull()
 
-                Spacer(
-                    modifier = Modifier.height(8.dp)
-                )
+                val minutes =
+                    minutesInput.text
+                        .toString()
+                        .toIntOrNull()
 
-                Text(
-                    text = if (enabled)
-                        "جاهز لاستقبال الطلبات"
-                    else
-                        "متوقف",
-
-                    fontSize = 20.sp,
-
-                    color = if (enabled)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.error
-                )
-
-                Spacer(
-                    modifier = Modifier.height(20.dp)
-                )
-
-                Card(
-                    modifier = Modifier.fillMaxWidth()
+                if (
+                    price == null ||
+                    price < 0
                 ) {
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
+                    Toast.makeText(
+                        this@MainActivity,
+                        "أدخل سعرًا صحيحًا",
+                        Toast.LENGTH_SHORT
+                    ).show()
 
-                        horizontalArrangement =
-                            Arrangement.SpaceBetween,
-
-                        verticalAlignment =
-                            Alignment.CenterVertically
-                    ) {
-
-                        Text(
-                            text = if (enabled)
-                                "RideClick يعمل"
-                            else
-                                "RideClick متوقف",
-
-                            fontSize = 18.sp
-                        )
-
-                        Switch(
-                            checked = enabled,
-
-                            onCheckedChange = {
-
-                                enabled = it
-
-                                saveSettings()
-
-                                if (enabled) {
-                                    openOverlaySettings()
-                                }
-                            }
-                        )
-                    }
+                    return@setOnClickListener
                 }
 
-                Spacer(
-                    modifier = Modifier.height(20.dp)
-                )
-
-                Text(
-                    text = "الخدمات المدعومة",
-                    fontSize = 20.sp,
-                    style = MaterialTheme.typography.titleLarge
-                )
-
-                Spacer(
-                    modifier = Modifier.height(8.dp)
-                )
-
-                Card(
-                    modifier = Modifier.fillMaxWidth()
+                if (
+                    minutes == null ||
+                    minutes <= 0
                 ) {
 
-                    Column(
-                        modifier = Modifier.padding(12.dp)
-                    ) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "أدخل عدد دقائق صحيحًا",
+                        Toast.LENGTH_SHORT
+                    ).show()
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-
-                            horizontalArrangement =
-                                Arrangement.SpaceBetween,
-
-                            verticalAlignment =
-                                Alignment.CenterVertically
-                        ) {
-
-                            Text(
-                                text = "جيني — Jeeny",
-                                fontSize = 17.sp
-                            )
-
-                            Switch(
-                                checked = jeenyEnabled,
-
-                                onCheckedChange = {
-
-                                    jeenyEnabled = it
-
-                                    saveSettings()
-                                }
-                            )
-                        }
-
-                        HorizontalDivider()
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-
-                            horizontalArrangement =
-                                Arrangement.SpaceBetween,
-
-                            verticalAlignment =
-                                Alignment.CenterVertically
-                        ) {
-
-                            Text(
-                                text = "بترا رايد — Petra Ride",
-                                fontSize = 17.sp
-                            )
-
-                            Switch(
-                                checked = petraEnabled,
-
-                                onCheckedChange = {
-
-                                    petraEnabled = it
-
-                                    saveSettings()
-                                }
-                            )
-                        }
-                    }
+                    return@setOnClickListener
                 }
 
-                Spacer(
-                    modifier = Modifier.height(20.dp)
-                )
+                prefs.edit()
+                    .putFloat(
+                        KEY_MIN_PRICE,
+                        price
+                    )
+                    .putInt(
+                        KEY_MAX_MINUTES,
+                        minutes
+                    )
+                    .apply()
 
-                Text(
-                    text = "فلاتر الطلبات",
-                    fontSize = 20.sp,
-                    style = MaterialTheme.typography.titleLarge
-                )
-
-                Spacer(
-                    modifier = Modifier.height(8.dp)
-                )
-
-                OutlinedTextField(
-                    value = minPrice,
-
-                    onValueChange = {
-                        minPrice = it
-                    },
-
-                    modifier = Modifier.fillMaxWidth(),
-
-                    label = {
-                        Text("الحد الأدنى للسعر")
-                    },
-
-                    singleLine = true
-                )
-
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
-
-                OutlinedTextField(
-                    value = maxTime,
-
-                    onValueChange = {
-                        maxTime = it
-                    },
-
-                    modifier = Modifier.fillMaxWidth(),
-
-                    label = {
-                        Text("أقصى وقت للطلب بالدقائق")
-                    },
-
-                    singleLine = true
-                )
-
-                Spacer(
-                    modifier = Modifier.height(20.dp)
-                )
-
-                Button(
-                    onClick = {
-                        saveSettings()
-                    },
-
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("حفظ الإعدادات")
-                }
-
-                Spacer(
-                    modifier = Modifier.height(8.dp)
-                )
-
-                TextButton(
-                    onClick = {
-
-                        val intent = Intent(
-                            Settings.ACTION_ACCESSIBILITY_SETTINGS
-                        )
-
-                        context.startActivity(intent)
-                    }
-                ) {
-                    Text("تفعيل Accessibility")
-                }
-
-                Spacer(
-                    modifier = Modifier.height(8.dp)
-                )
-
-                Button(
-                    onClick = {
-                        openOverlaySettings()
-                    },
-
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("تشغيل الفقاعة العائمة")
-                }
-
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
-
-                Text(
-                    text =
-                        "السعر ≥ $minPrice د.أ  •  الوقت ≤ $maxTime دقائق",
-
-                    fontSize = 14.sp
-                )
+                Toast.makeText(
+                    this@MainActivity,
+                    "✅ تم حفظ الفلاتر: السعر ≥ %.2f JOD — الوقت ≤ %d دقيقة"
+                        .format(
+                            price,
+                            minutes
+                        ),
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
+
+        layout.addView(saveButton)
+
+        // =========================
+        // تشغيل الفقاعة
+        // =========================
+
+        val overlayButton = Button(this).apply {
+
+            text = "🟢 تشغيل RideClick"
+
+            setOnClickListener {
+
+                if (
+                    !Settings.canDrawOverlays(
+                        this@MainActivity
+                    )
+                ) {
+
+                    Toast.makeText(
+                        this@MainActivity,
+                        "فعّل إذن الظهور فوق التطبيقات",
+                        Toast.LENGTH_LONG
+                    ).show()
+
+                    return@setOnClickListener
+                }
+
+                startService(
+                    Intent(
+                        this@MainActivity,
+                        RideClickOverlayService::class.java
+                    )
+                )
+
+                Toast.makeText(
+                    this@MainActivity,
+                    "RideClick يعمل",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+        layout.addView(overlayButton)
+
+        setContentView(layout)
     }
 }

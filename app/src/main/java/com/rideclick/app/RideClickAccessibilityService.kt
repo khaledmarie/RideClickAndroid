@@ -1,6 +1,7 @@
 package com.rideclick.app
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -10,106 +11,90 @@ class RideClickAccessibilityService : AccessibilityService() {
     companion object {
         private const val TAG = "RideClick"
 
-        // شروط RideClick الحالية
         private const val MIN_PRICE = 4.00
         private const val MAX_MINUTES = 5
+
+        const val ACTION_OFFER_UPDATE =
+            "com.rideclick.app.OFFER_UPDATE"
+
+        const val EXTRA_PRICE = "price"
+        const val EXTRA_MINUTES = "minutes"
+        const val EXTRA_MATCHED = "matched"
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-
-        Log.d(TAG, "RideClick Accessibility started")
+        Log.d(TAG, "Accessibility started")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
 
-        if (event == null) return
-
         val root = rootInActiveWindow ?: return
 
-        // قراءة جميع النصوص الموجودة على الشاشة
-        val screenTexts = mutableListOf<String>()
+        val texts = mutableListOf<String>()
 
-        collectTexts(root, screenTexts)
+        collectTexts(root, texts)
 
-        if (screenTexts.isEmpty()) return
+        if (texts.isEmpty()) return
 
-        val fullText = screenTexts.joinToString(" | ")
+        val fullText = texts.joinToString(" | ")
 
         Log.d(TAG, "SCREEN = $fullText")
 
-        // هل ظهر طلب جيني؟
+        // التأكد أن هناك عرضًا ظاهرًا
         val offerDetected =
-            fullText.contains(
-                "قبول العرض",
-                ignoreCase = true
-            ) ||
-            fullText.contains(
-                "JOD",
-                ignoreCase = true
-            )
+            fullText.contains("قبول العرض", true) ||
+            fullText.contains("JOD", true)
 
-        if (!offerDetected) {
-            return
-        }
+        if (!offerDetected) return
 
-        Log.d(TAG, "New Jeeny offer detected")
-
-        // استخراج السعر
-        val price = extractPrice(screenTexts)
-
-        // استخراج وقت الوصول
-        val minutes = extractMinutes(screenTexts)
+        val price = extractPrice(texts)
+        val minutes = extractMinutes(texts)
 
         Log.d(
             TAG,
-            "PRICE = $price | MINUTES = $minutes"
+            "PRICE=$price MINUTES=$minutes"
         )
 
-        // لا نحكم على الطلب إلا إذا قرأنا القيمتين
         if (price == null || minutes == null) {
-
-            Log.d(
-                TAG,
-                "Offer detected but data incomplete"
-            )
-
             return
         }
 
-        // مقارنة الطلب بالشروط
-        val priceAccepted =
-            price >= MIN_PRICE
-
-        val timeAccepted =
+        val matched =
+            price >= MIN_PRICE &&
             minutes <= MAX_MINUTES
 
-        val accepted =
-            priceAccepted && timeAccepted
-
-        if (accepted) {
-
-            Log.d(
-                TAG,
-                "✅ MATCHED OFFER | " +
-                    "Price=$price | " +
-                    "Minutes=$minutes"
-            )
-
-        } else {
-
-            Log.d(
-                TAG,
-                "❌ REJECTED OFFER | " +
-                    "Price=$price | " +
-                    "Minutes=$minutes"
-            )
-        }
+        sendOfferToOverlay(
+            price,
+            minutes,
+            matched
+        )
     }
 
-    /**
-     * قراءة جميع النصوص الموجودة داخل شجرة Accessibility
-     */
+    private fun sendOfferToOverlay(
+        price: Double,
+        minutes: Int,
+        matched: Boolean
+    ) {
+
+        val intent =
+            Intent(ACTION_OFFER_UPDATE).apply {
+
+                setPackage(packageName)
+
+                putExtra(EXTRA_PRICE, price)
+                putExtra(EXTRA_MINUTES, minutes)
+                putExtra(EXTRA_MATCHED, matched)
+            }
+
+        sendBroadcast(intent)
+
+        Log.d(
+            TAG,
+            "Offer sent to overlay: $price / $minutes / $matched"
+        )
+    }
+
     private fun collectTexts(
         node: AccessibilityNodeInfo?,
         result: MutableList<String>
@@ -117,57 +102,29 @@ class RideClickAccessibilityService : AccessibilityService() {
 
         if (node == null) return
 
-        try {
+        node.text
+            ?.toString()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { result.add(it) }
 
-            val text =
-                node.text
-                    ?.toString()
-                    ?.trim()
-
-            if (!text.isNullOrEmpty()) {
-
-                result.add(text)
+        node.contentDescription
+            ?.toString()
+            ?.trim()
+            ?.takeIf {
+                it.isNotEmpty() &&
+                !result.contains(it)
             }
+            ?.let { result.add(it) }
 
-            val description =
-                node.contentDescription
-                    ?.toString()
-                    ?.trim()
-
-            if (
-                !description.isNullOrEmpty() &&
-                !result.contains(description)
-            ) {
-
-                result.add(description)
-            }
-
-            for (i in 0 until node.childCount) {
-
-                collectTexts(
-                    node.getChild(i),
-                    result
-                )
-            }
-
-        } catch (e: Exception) {
-
-            Log.e(
-                TAG,
-                "Error reading accessibility nodes",
-                e
+        for (i in 0 until node.childCount) {
+            collectTexts(
+                node.getChild(i),
+                result
             )
         }
     }
 
-    /**
-     * محاولة استخراج السعر.
-     *
-     * أمثلة:
-     * JOD 1.50
-     * 1.50 JOD
-     * JOD 4.25
-     */
     private fun extractPrice(
         texts: List<String>
     ): Double? {
@@ -197,27 +154,14 @@ class RideClickAccessibilityService : AccessibilityService() {
                     match.groupValues[1]
                         .replace(",", ".")
 
-                val price =
-                    value.toDoubleOrNull()
-
-                if (price != null) {
-
-                    return price
-                }
+                value.toDoubleOrNull()
+                    ?.let { return it }
             }
         }
 
         return null
     }
 
-    /**
-     * استخراج عدد دقائق الوصول.
-     *
-     * أمثلة:
-     * يبعد 1 دقائق
-     * يبعد 3 دقائق
-     * 5 دقائق
-     */
     private fun extractMinutes(
         texts: List<String>
     ): Int? {
@@ -245,14 +189,9 @@ class RideClickAccessibilityService : AccessibilityService() {
                     regex.find(text)
                         ?: continue
 
-                val minutes =
-                    match.groupValues[1]
-                        .toIntOrNull()
-
-                if (minutes != null) {
-
-                    return minutes
-                }
+                match.groupValues[1]
+                    .toIntOrNull()
+                    ?.let { return it }
             }
         }
 
@@ -260,10 +199,9 @@ class RideClickAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-
         Log.d(
             TAG,
-            "RideClick Accessibility interrupted"
+            "Accessibility interrupted"
         )
     }
 }

@@ -21,74 +21,110 @@ import kotlin.math.abs
 
 class RideClickOverlayService : Service() {
 
-    private lateinit var windowManager: WindowManager
-    private var overlayView: View? = null
+    private lateinit var windowManager:
+        WindowManager
+
+    private var overlayView:
+        View? = null
 
     // موقع الفقاعة
     private var bubbleX = 20
     private var bubbleY = 120
 
-    // آخر طلب تمت قراءته
-    private var lastPrice: Double? = null
-    private var lastMinutes: Int? = null
-    private var lastMatched: Boolean? = null
+    // آخر طلب
+    private var lastPrice:
+        Double? = null
 
-    // مكان عرض نتيجة الطلب داخل اللوحة
-    private var offerTextView: TextView? = null
+    private var lastMinutes:
+        Int? = null
 
-    // استقبال بيانات الطلب من Accessibility Service
-    private val offerReceiver = object : BroadcastReceiver() {
+    private var lastMatched:
+        Boolean? = null
 
-        override fun onReceive(
-            context: Context?,
-            intent: Intent?
-        ) {
+    // هل تم العثور على شريط القبول؟
+    private var lastAcceptFound:
+        Boolean? = null
 
-            if (
-                intent?.action !=
-                RideClickAccessibilityService.ACTION_OFFER_UPDATE
+    private var offerTextView:
+        TextView? = null
+
+    // =============================
+    // استقبال البيانات
+    // =============================
+
+    private val offerReceiver =
+        object : BroadcastReceiver() {
+
+            override fun onReceive(
+                context: Context?,
+                intent: Intent?
             ) {
-                return
+
+                if (
+                    intent?.action !=
+                    RideClickAccessibilityService
+                        .ACTION_OFFER_UPDATE
+                ) {
+                    return
+                }
+
+                val price =
+                    intent.getDoubleExtra(
+                        RideClickAccessibilityService
+                            .EXTRA_PRICE,
+                        0.0
+                    )
+
+                val minutes =
+                    intent.getIntExtra(
+                        RideClickAccessibilityService
+                            .EXTRA_MINUTES,
+                        0
+                    )
+
+                val matched =
+                    intent.getBooleanExtra(
+                        RideClickAccessibilityService
+                            .EXTRA_MATCHED,
+                        false
+                    )
+
+                val acceptFound =
+                    intent.getBooleanExtra(
+                        RideClickAccessibilityService
+                            .EXTRA_ACCEPT_FOUND,
+                        false
+                    )
+
+                lastPrice =
+                    price
+
+                lastMinutes =
+                    minutes
+
+                lastMatched =
+                    matched
+
+                lastAcceptFound =
+                    acceptFound
+
+                updateOfferText()
             }
-
-            val price =
-                intent.getDoubleExtra(
-                    RideClickAccessibilityService.EXTRA_PRICE,
-                    0.0
-                )
-
-            val minutes =
-                intent.getIntExtra(
-                    RideClickAccessibilityService.EXTRA_MINUTES,
-                    0
-                )
-
-            val matched =
-                intent.getBooleanExtra(
-                    RideClickAccessibilityService.EXTRA_MATCHED,
-                    false
-                )
-
-            // حفظ آخر طلب
-            lastPrice = price
-            lastMinutes = minutes
-            lastMatched = matched
-
-            // تحديث اللوحة إذا كانت مفتوحة
-            updateOfferText()
         }
-    }
 
     override fun onCreate() {
+
         super.onCreate()
 
         windowManager =
-            getSystemService(WINDOW_SERVICE) as WindowManager
+            getSystemService(
+                WINDOW_SERVICE
+            ) as WindowManager
 
-        // تسجيل Receiver لاستقبال نتائج القراءة
         val filter =
             IntentFilter(
-                RideClickAccessibilityService.ACTION_OFFER_UPDATE
+                RideClickAccessibilityService
+                    .ACTION_OFFER_UPDATE
             )
 
         registerReceiver(
@@ -100,32 +136,54 @@ class RideClickOverlayService : Service() {
         showBubble()
     }
 
+    // =============================
+    // إعدادات Overlay
+    // =============================
+
     private fun createLayoutParams():
         WindowManager.LayoutParams {
 
         return WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+
+            WindowManager.LayoutParams
+                .WRAP_CONTENT,
+
+            WindowManager.LayoutParams
+                .WRAP_CONTENT,
+
+            WindowManager.LayoutParams
+                .TYPE_APPLICATION_OVERLAY,
+
+            WindowManager.LayoutParams
+                .FLAG_NOT_FOCUSABLE,
+
             PixelFormat.TRANSLUCENT
+
         ).apply {
 
             gravity =
-                Gravity.TOP or Gravity.END
+                Gravity.TOP or
+                Gravity.END
 
             x = bubbleX
             y = bubbleY
         }
     }
 
+    // =============================
+    // الفقاعة
+    // =============================
+
     private fun showBubble() {
 
-        // إزالة الواجهة القديمة
         overlayView?.let {
 
             try {
-                windowManager.removeView(it)
+
+                windowManager.removeView(
+                    it
+                )
+
             } catch (_: Exception) {
             }
         }
@@ -133,7 +191,6 @@ class RideClickOverlayService : Service() {
         overlayView = null
         offerTextView = null
 
-        // صورة التكسي الأصفر
         val bubble =
             ImageView(this).apply {
 
@@ -142,7 +199,8 @@ class RideClickOverlayService : Service() {
                 )
 
                 scaleType =
-                    ImageView.ScaleType.FIT_CENTER
+                    ImageView.ScaleType
+                        .FIT_CENTER
 
                 contentDescription =
                     "RideClick"
@@ -151,17 +209,20 @@ class RideClickOverlayService : Service() {
         val params =
             createLayoutParams()
 
-        // حجم الفقاعة 65dp
         val bubbleSize =
             (
                 65 *
-                    resources.displayMetrics.density
-                ).toInt()
+                resources
+                    .displayMetrics
+                    .density
+            ).toInt()
 
-        params.width = bubbleSize
-        params.height = bubbleSize
+        params.width =
+            bubbleSize
 
-        // متغيرات السحب
+        params.height =
+            bubbleSize
+
         var initialX = 0
         var initialY = 0
 
@@ -170,14 +231,21 @@ class RideClickOverlayService : Service() {
 
         var isDragging = false
 
-        bubble.setOnTouchListener { view, event ->
+        bubble.setOnTouchListener {
+                view,
+                event ->
 
-            when (event.actionMasked) {
+            when (
+                event.actionMasked
+            ) {
 
                 MotionEvent.ACTION_DOWN -> {
 
-                    initialX = params.x
-                    initialY = params.y
+                    initialX =
+                        params.x
+
+                    initialY =
+                        params.y
 
                     initialTouchX =
                         event.rawX
@@ -185,7 +253,8 @@ class RideClickOverlayService : Service() {
                     initialTouchY =
                         event.rawY
 
-                    isDragging = false
+                    isDragging =
+                        false
 
                     true
                 }
@@ -194,43 +263,46 @@ class RideClickOverlayService : Service() {
 
                     val dx =
                         event.rawX -
-                            initialTouchX
+                        initialTouchX
 
                     val dy =
                         event.rawY -
-                            initialTouchY
+                        initialTouchY
 
                     if (
                         abs(dx) > 10 ||
                         abs(dy) > 10
                     ) {
-                        isDragging = true
+
+                        isDragging =
+                            true
                     }
 
                     if (isDragging) {
 
-                        // لأن الفقاعة مثبتة من جهة اليمين
                         params.x =
                             initialX -
-                                dx.toInt()
+                            dx.toInt()
 
                         params.y =
                             initialY +
-                                dy.toInt()
+                            dy.toInt()
 
-                        // منع الإحداثيات السالبة
                         params.x =
-                            params.x.coerceAtLeast(0)
+                            params.x
+                                .coerceAtLeast(0)
 
                         params.y =
-                            params.y.coerceAtLeast(0)
+                            params.y
+                                .coerceAtLeast(0)
 
                         try {
 
-                            windowManager.updateViewLayout(
-                                view,
-                                params
-                            )
+                            windowManager
+                                .updateViewLayout(
+                                    view,
+                                    params
+                                )
 
                         } catch (_: Exception) {
                         }
@@ -243,14 +315,17 @@ class RideClickOverlayService : Service() {
 
                     if (isDragging) {
 
-                        // حفظ موقع الفقاعة
-                        bubbleX = params.x
-                        bubbleY = params.y
+                        bubbleX =
+                            params.x
+
+                        bubbleY =
+                            params.y
 
                     } else {
 
-                        // الضغط يفتح لوحة المعلومات
-                        showPanel(view)
+                        showPanel(
+                            view
+                        )
                     }
 
                     true
@@ -258,7 +333,9 @@ class RideClickOverlayService : Service() {
 
                 MotionEvent.ACTION_CANCEL -> {
 
-                    isDragging = false
+                    isDragging =
+                        false
+
                     true
                 }
 
@@ -271,8 +348,13 @@ class RideClickOverlayService : Service() {
             params
         )
 
-        overlayView = bubble
+        overlayView =
+            bubble
     }
+
+    // =============================
+    // لوحة المعلومات
+    // =============================
 
     private fun showPanel(
         oldBubble: View
@@ -302,7 +384,8 @@ class RideClickOverlayService : Service() {
                             )
                         )
 
-                        cornerRadius = 30f
+                        cornerRadius =
+                            30f
 
                         setStroke(
                             2,
@@ -316,24 +399,29 @@ class RideClickOverlayService : Service() {
             }
 
         // =========================
-        // عنوان التطبيق
+        // العنوان
         // =========================
 
         val title =
             TextView(this).apply {
 
-                text = "🚕 RideClick"
-                textSize = 20f
+                text =
+                    "🚕 RideClick"
+
+                textSize =
+                    20f
 
                 setTextColor(
                     Color.WHITE
                 )
             }
 
-        panel.addView(title)
+        panel.addView(
+            title
+        )
 
         // =========================
-        // حالة التطبيق
+        // الحالة
         // =========================
 
         val status =
@@ -342,7 +430,8 @@ class RideClickOverlayService : Service() {
                 text =
                     "● جاهز لاستقبال الطلبات"
 
-                textSize = 16f
+                textSize =
+                    16f
 
                 setTextColor(
                     Color.GREEN
@@ -351,11 +440,14 @@ class RideClickOverlayService : Service() {
 
         val statusParams =
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams
+                    .WRAP_CONTENT,
+                LinearLayout.LayoutParams
+                    .WRAP_CONTENT
             ).apply {
 
-                topMargin = 15
+                topMargin =
+                    15
             }
 
         panel.addView(
@@ -364,13 +456,14 @@ class RideClickOverlayService : Service() {
         )
 
         // =========================
-        // نتيجة قراءة طلب Jeeny
+        // بيانات الطلب
         // =========================
 
         offerTextView =
             TextView(this).apply {
 
-                textSize = 18f
+                textSize =
+                    18f
 
                 setTextColor(
                     Color.WHITE
@@ -397,17 +490,21 @@ class RideClickOverlayService : Service() {
                             )
                         )
 
-                        cornerRadius = 20f
+                        cornerRadius =
+                            20f
                     }
             }
 
         val offerParams =
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams
+                    .MATCH_PARENT,
+                LinearLayout.LayoutParams
+                    .WRAP_CONTENT
             ).apply {
 
-                topMargin = 20
+                topMargin =
+                    20
             }
 
         panel.addView(
@@ -415,42 +512,7 @@ class RideClickOverlayService : Service() {
             offerParams
         )
 
-        // عرض آخر طلب إن وجد
         updateOfferText()
-
-        // =========================
-        // الخدمات
-        // =========================
-
-        val services =
-            TextView(this).apply {
-
-                text = """
-                    🚕 الخدمات:
-                    جيني
-                    بترا رايد
-                """.trimIndent()
-
-                textSize = 15f
-
-                setTextColor(
-                    Color.WHITE
-                )
-            }
-
-        val servicesParams =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-
-                topMargin = 15
-            }
-
-        panel.addView(
-            services,
-            servicesParams
-        )
 
         // =========================
         // الفلاتر
@@ -459,13 +521,15 @@ class RideClickOverlayService : Service() {
         val filters =
             TextView(this).apply {
 
-                text = """
+                text =
+                    """
                     ⚙️ الفلاتر:
                     السعر ≥ 4.00 د.أ
                     الوقت ≤ 5 دقائق
-                """.trimIndent()
+                    """.trimIndent()
 
-                textSize = 15f
+                textSize =
+                    15f
 
                 setTextColor(
                     Color.WHITE
@@ -474,11 +538,14 @@ class RideClickOverlayService : Service() {
 
         val filtersParams =
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams
+                    .WRAP_CONTENT,
+                LinearLayout.LayoutParams
+                    .WRAP_CONTENT
             ).apply {
 
-                topMargin = 15
+                topMargin =
+                    15
             }
 
         panel.addView(
@@ -487,7 +554,7 @@ class RideClickOverlayService : Service() {
         )
 
         // =========================
-        // زر إيقاف التطبيق
+        // إيقاف
         // =========================
 
         val stopButton =
@@ -497,17 +564,21 @@ class RideClickOverlayService : Service() {
                     "إيقاف RideClick"
 
                 setOnClickListener {
+
                     stopSelf()
                 }
             }
 
         val stopParams =
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams
+                    .MATCH_PARENT,
+                LinearLayout.LayoutParams
+                    .WRAP_CONTENT
             ).apply {
 
-                topMargin = 20
+                topMargin =
+                    20
             }
 
         panel.addView(
@@ -516,32 +587,27 @@ class RideClickOverlayService : Service() {
         )
 
         // =========================
-        // زر التصغير
+        // تصغير
         // =========================
 
         val minimizeButton =
             Button(this).apply {
 
-                text = "تصغير"
+                text =
+                    "تصغير"
 
                 setOnClickListener {
+
                     showBubble()
                 }
             }
 
-        val minimizeParams =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-
         panel.addView(
-            minimizeButton,
-            minimizeParams
+            minimizeButton
         )
 
         // =========================
-        // عرض اللوحة مكان الفقاعة
+        // عرض اللوحة
         // =========================
 
         val panelParams =
@@ -549,33 +615,34 @@ class RideClickOverlayService : Service() {
 
         try {
 
-            // إضافة اللوحة أولاً
             windowManager.addView(
                 panel,
                 panelParams
             )
 
-            // ثم إزالة الفقاعة
             windowManager.removeView(
                 oldBubble
             )
 
-            overlayView = panel
+            overlayView =
+                panel
 
         } catch (_: Exception) {
 
             try {
+
                 windowManager.removeView(
                     panel
                 )
+
             } catch (_: Exception) {
             }
         }
     }
 
-    // =========================
-    // تحديث بيانات طلب Jeeny
-    // =========================
+    // =============================
+    // تحديث بيانات الطلب
+    // =============================
 
     private fun updateOfferText() {
 
@@ -591,7 +658,9 @@ class RideClickOverlayService : Service() {
         val matched =
             lastMatched
 
-        // لم يتم التقاط أي طلب حتى الآن
+        val acceptFound =
+            lastAcceptFound
+
         if (
             price == null ||
             minutes == null ||
@@ -611,7 +680,18 @@ class RideClickOverlayService : Service() {
             return
         }
 
-        // الطلب مطابق للشروط
+        val acceptStatus =
+            if (
+                acceptFound == true
+            ) {
+
+                "🎯 تم العثور على شريط قبول العرض"
+
+            } else {
+
+                "⚠️ لم يتم العثور على شريط قبول العرض"
+            }
+
         if (matched) {
 
             textView.text =
@@ -620,6 +700,8 @@ class RideClickOverlayService : Service() {
                 💰 JOD %.2f
                 ⏱️ %d دقيقة
                 ✅ مطابق للشروط
+                
+                $acceptStatus
                 """.trimIndent()
                     .format(
                         price,
@@ -632,13 +714,14 @@ class RideClickOverlayService : Service() {
 
         } else {
 
-            // الطلب غير مطابق للشروط
             textView.text =
                 """
                 📥 آخر طلب Jeeny
                 💰 JOD %.2f
                 ⏱️ %d دقيقة
                 ❌ غير مطابق للشروط
+                
+                $acceptStatus
                 """.trimIndent()
                     .format(
                         price,
@@ -655,9 +738,12 @@ class RideClickOverlayService : Service() {
         }
     }
 
+    // =============================
+    // إغلاق الخدمة
+    // =============================
+
     override fun onDestroy() {
 
-        // إلغاء استقبال Broadcast
         try {
 
             unregisterReceiver(
@@ -667,7 +753,6 @@ class RideClickOverlayService : Service() {
         } catch (_: Exception) {
         }
 
-        // إزالة الـ Overlay
         overlayView?.let {
 
             try {
@@ -680,8 +765,11 @@ class RideClickOverlayService : Service() {
             }
         }
 
-        overlayView = null
-        offerTextView = null
+        overlayView =
+            null
+
+        offerTextView =
+            null
 
         super.onDestroy()
     }

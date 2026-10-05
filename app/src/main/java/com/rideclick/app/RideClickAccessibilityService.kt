@@ -13,18 +13,17 @@ class RideClickAccessibilityService : AccessibilityService() {
 
         private const val TAG = "RideClick"
 
-        private const val MIN_PRICE = 4.00
-        private const val MAX_MINUTES = 5
-
         const val ACTION_OFFER_UPDATE =
             "com.rideclick.app.OFFER_UPDATE"
 
         const val EXTRA_PRICE = "price"
         const val EXTRA_MINUTES = "minutes"
         const val EXTRA_MATCHED = "matched"
-
-        // هل تم العثور على شريط قبول العرض؟
         const val EXTRA_ACCEPT_FOUND = "accept_found"
+
+        // إرسال الفلاتر الحالية للـ Overlay أيضًا
+        const val EXTRA_MIN_PRICE = "min_price"
+        const val EXTRA_MAX_MINUTES = "max_minutes"
 
         private const val OFFER_COOLDOWN = 1500L
     }
@@ -119,6 +118,34 @@ class RideClickAccessibilityService : AccessibilityService() {
         }
 
         // =========================
+        // قراءة الفلاتر المحفوظة
+        // من الواجهة الرئيسية
+        // =========================
+
+        val prefs =
+            getSharedPreferences(
+                MainActivity.PREFS_NAME,
+                MODE_PRIVATE
+            )
+
+        val minPrice =
+            prefs.getFloat(
+                MainActivity.KEY_MIN_PRICE,
+                MainActivity.DEFAULT_MIN_PRICE
+            ).toDouble()
+
+        val maxMinutes =
+            prefs.getInt(
+                MainActivity.KEY_MAX_MINUTES,
+                MainActivity.DEFAULT_MAX_MINUTES
+            )
+
+        Log.d(
+            TAG,
+            "FILTERS: PRICE >= $minPrice | MINUTES <= $maxMinutes"
+        )
+
+        // =========================
         // منع تكرار نفس الطلب بسرعة
         // =========================
 
@@ -130,7 +157,8 @@ class RideClickAccessibilityService : AccessibilityService() {
 
         if (
             offerKey == lastOfferKey &&
-            now - lastOfferTime < OFFER_COOLDOWN
+            now - lastOfferTime <
+            OFFER_COOLDOWN
         ) {
             return
         }
@@ -143,11 +171,12 @@ class RideClickAccessibilityService : AccessibilityService() {
 
         // =========================
         // فحص شروط الطلب
+        // باستخدام الفلاتر الجديدة
         // =========================
 
         val matched =
-            price >= MIN_PRICE &&
-            minutes <= MAX_MINUTES
+            price >= minPrice &&
+            minutes <= maxMinutes
 
         Log.d(
             TAG,
@@ -226,14 +255,16 @@ class RideClickAccessibilityService : AccessibilityService() {
         }
 
         // =========================
-        // إرسال كل النتائج للـ Overlay
+        // إرسال النتائج للـ Overlay
         // =========================
 
         sendOfferToOverlay(
-            price,
-            minutes,
-            matched,
-            acceptFound
+            price = price,
+            minutes = minutes,
+            matched = matched,
+            acceptFound = acceptFound,
+            minPrice = minPrice,
+            maxMinutes = maxMinutes
         )
     }
 
@@ -245,7 +276,9 @@ class RideClickAccessibilityService : AccessibilityService() {
         price: Double,
         minutes: Int,
         matched: Boolean,
-        acceptFound: Boolean
+        acceptFound: Boolean,
+        minPrice: Double,
+        maxMinutes: Int
     ) {
 
         val intent =
@@ -275,6 +308,16 @@ class RideClickAccessibilityService : AccessibilityService() {
                 putExtra(
                     EXTRA_ACCEPT_FOUND,
                     acceptFound
+                )
+
+                putExtra(
+                    EXTRA_MIN_PRICE,
+                    minPrice
+                )
+
+                putExtra(
+                    EXTRA_MAX_MINUTES,
+                    maxMinutes
                 )
             }
 
@@ -315,7 +358,6 @@ class RideClickAccessibilityService : AccessibilityService() {
                 ignoreCase = true
             )
         ) {
-
             return node
         }
 
@@ -357,10 +399,7 @@ class RideClickAccessibilityService : AccessibilityService() {
         if (
             !text.isNullOrEmpty()
         ) {
-
-            result.add(
-                text
-            )
+            result.add(text)
         }
 
         val description =
@@ -370,14 +409,9 @@ class RideClickAccessibilityService : AccessibilityService() {
 
         if (
             !description.isNullOrEmpty() &&
-            !result.contains(
-                description
-            )
+            !result.contains(description)
         ) {
-
-            result.add(
-                description
-            )
+            result.add(description)
         }
 
         for (
@@ -415,9 +449,7 @@ class RideClickAccessibilityService : AccessibilityService() {
 
         for (text in texts) {
 
-            for (
-                regex in regexes
-            ) {
+            for (regex in regexes) {
 
                 val match =
                     regex.find(text)
@@ -469,9 +501,7 @@ class RideClickAccessibilityService : AccessibilityService() {
 
         for (text in texts) {
 
-            for (
-                regex in regexes
-            ) {
+            for (regex in regexes) {
 
                 val match =
                     regex.find(text)

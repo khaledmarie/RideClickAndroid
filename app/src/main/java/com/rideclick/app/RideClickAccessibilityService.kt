@@ -1,8 +1,6 @@
 package com.rideclick.app
 
 import android.accessibilityservice.AccessibilityService
-import android.content.Intent
-import android.graphics.Rect
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -10,522 +8,104 @@ import android.view.accessibility.AccessibilityNodeInfo
 class RideClickAccessibilityService : AccessibilityService() {
 
     companion object {
-
         private const val TAG = "RideClick"
-
-        const val ACTION_OFFER_UPDATE =
-            "com.rideclick.app.OFFER_UPDATE"
-
-        const val EXTRA_PRICE = "price"
-        const val EXTRA_MINUTES = "minutes"
-        const val EXTRA_MATCHED = "matched"
-        const val EXTRA_ACCEPT_FOUND = "accept_found"
-
-        // إرسال الفلاتر الحالية للـ Overlay أيضًا
-        const val EXTRA_MIN_PRICE = "min_price"
-        const val EXTRA_MAX_MINUTES = "max_minutes"
-
-        private const val OFFER_COOLDOWN = 1500L
     }
-
-    private var lastOfferKey = ""
-    private var lastOfferTime = 0L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-
-        Log.d(
-            TAG,
-            "RideClick Accessibility started"
-        )
+        Log.d(TAG, "RideClick Accessibility Service connected")
     }
 
-    override fun onAccessibilityEvent(
-        event: AccessibilityEvent?
-    ) {
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
 
-        val root =
-            rootInActiveWindow ?: return
+        if (event == null) return
 
-        val texts =
-            mutableListOf<String>()
+        val root = rootInActiveWindow ?: return
 
-        collectTexts(
-            root,
-            texts
-        )
-
-        if (texts.isEmpty()) {
-            return
-        }
-
-        val fullText =
-            texts.joinToString(" | ")
-
-        Log.d(
-            TAG,
-            "SCREEN = $fullText"
-        )
-
-        // =========================
-        // اكتشاف طلب Jeeny
-        // =========================
-
-        val offerDetected =
-            fullText.contains(
-                "قبول العرض",
-                ignoreCase = true
-            ) ||
-            fullText.contains(
-                "JOD",
-                ignoreCase = true
-            )
-
-        if (!offerDetected) {
-            return
-        }
-
-        // =========================
-        // استخراج السعر
-        // =========================
-
-        val price =
-            extractPrice(texts)
-
-        // =========================
-        // استخراج الدقائق
-        // =========================
-
-        val minutes =
-            extractMinutes(texts)
-
-        Log.d(
-            TAG,
-            "PRICE=$price | MINUTES=$minutes"
-        )
-
-        if (
-            price == null ||
-            minutes == null
-        ) {
-
-            Log.d(
-                TAG,
-                "Offer detected but data incomplete"
-            )
-
-            return
-        }
-
-        // =========================
-        // قراءة الفلاتر المحفوظة
-        // من الواجهة الرئيسية
-        // =========================
-
-        val prefs =
-            getSharedPreferences(
-                MainActivity.PREFS_NAME,
-                MODE_PRIVATE
-            )
-
-        val minPrice =
-            prefs.getFloat(
-                MainActivity.KEY_MIN_PRICE,
-                MainActivity.DEFAULT_MIN_PRICE
-            ).toDouble()
-
-        val maxMinutes =
-            prefs.getInt(
-                MainActivity.KEY_MAX_MINUTES,
-                MainActivity.DEFAULT_MAX_MINUTES
-            )
-
-        Log.d(
-            TAG,
-            "FILTERS: PRICE >= $minPrice | MINUTES <= $maxMinutes"
-        )
-
-        // =========================
-        // منع تكرار نفس الطلب بسرعة
-        // =========================
-
-        val offerKey =
-            "$price-$minutes"
-
-        val now =
-            System.currentTimeMillis()
-
-        if (
-            offerKey == lastOfferKey &&
-            now - lastOfferTime <
-            OFFER_COOLDOWN
-        ) {
-            return
-        }
-
-        lastOfferKey =
-            offerKey
-
-        lastOfferTime =
-            now
-
-        // =========================
-        // فحص شروط الطلب
-        // باستخدام الفلاتر الجديدة
-        // =========================
-
-        val matched =
-            price >= minPrice &&
-            minutes <= maxMinutes
-
-        Log.d(
-            TAG,
-            if (matched) {
-                "✅ OFFER MATCHED"
-            } else {
-                "❌ OFFER NOT MATCHED"
-            }
-        )
-
-        // =========================
-        // البحث عن شريط قبول العرض
-        // =========================
-
-        val acceptNode =
-            findAcceptNode(root)
-
-        val acceptFound =
-            acceptNode != null
-
-        if (acceptNode != null) {
-
-            val bounds =
-                Rect()
-
-            acceptNode.getBoundsInScreen(
-                bounds
-            )
-
-            Log.d(
-                TAG,
-                "✅ ACCEPT CONTROL FOUND"
-            )
-
-            Log.d(
-                TAG,
-                "Accept text = ${acceptNode.text}"
-            )
-
-            Log.d(
-                TAG,
-                "Accept description = ${acceptNode.contentDescription}"
-            )
-
-            Log.d(
-                TAG,
-                "Accept class = ${acceptNode.className}"
-            )
-
-            Log.d(
-                TAG,
-                "Accept bounds = $bounds"
-            )
-
-            Log.d(
-                TAG,
-                "Clickable = ${acceptNode.isClickable}"
-            )
-
-            Log.d(
-                TAG,
-                "Scrollable = ${acceptNode.isScrollable}"
-            )
-
-            Log.d(
-                TAG,
-                "Enabled = ${acceptNode.isEnabled}"
-            )
-
-        } else {
-
-            Log.d(
-                TAG,
-                "⚠️ ACCEPT CONTROL NOT FOUND"
-            )
-        }
-
-        // =========================
-        // إرسال النتائج للـ Overlay
-        // =========================
-
-        sendOfferToOverlay(
-            price = price,
-            minutes = minutes,
-            matched = matched,
-            acceptFound = acceptFound,
-            minPrice = minPrice,
-            maxMinutes = maxMinutes
-        )
+        // حالياً نقرأ الشاشة فقط
+        // لاحقاً سنربطها بفلاتر السعر والوقت
+        inspectScreen(root)
     }
 
-    // =============================
-    // إرسال البيانات للـ Overlay
-    // =============================
+    private fun inspectScreen(root: AccessibilityNodeInfo) {
 
-    private fun sendOfferToOverlay(
-        price: Double,
-        minutes: Int,
-        matched: Boolean,
-        acceptFound: Boolean,
-        minPrice: Double,
-        maxMinutes: Int
-    ) {
+        // البحث عن زر قبول العرض في Jeeny
+        val acceptNodes =
+            root.findAccessibilityNodeInfosByText("قبول العرض")
 
-        val intent =
-            Intent(
-                ACTION_OFFER_UPDATE
-            ).apply {
+        if (!acceptNodes.isNullOrEmpty()) {
 
-                setPackage(
-                    packageName
-                )
+            Log.d(TAG, "Jeeny offer detected")
 
-                putExtra(
-                    EXTRA_PRICE,
-                    price
-                )
-
-                putExtra(
-                    EXTRA_MINUTES,
-                    minutes
-                )
-
-                putExtra(
-                    EXTRA_MATCHED,
-                    matched
-                )
-
-                putExtra(
-                    EXTRA_ACCEPT_FOUND,
-                    acceptFound
-                )
-
-                putExtra(
-                    EXTRA_MIN_PRICE,
-                    minPrice
-                )
-
-                putExtra(
-                    EXTRA_MAX_MINUTES,
-                    maxMinutes
-                )
-            }
-
-        sendBroadcast(intent)
-    }
-
-    // =============================
-    // البحث عن "قبول العرض"
-    // =============================
-
-    private fun findAcceptNode(
-        node: AccessibilityNodeInfo?
-    ): AccessibilityNodeInfo? {
-
-        if (node == null) {
-            return null
-        }
-
-        val text =
-            node.text
-                ?.toString()
-                ?.trim()
-                .orEmpty()
-
-        val description =
-            node.contentDescription
-                ?.toString()
-                ?.trim()
-                .orEmpty()
-
-        if (
-            text.contains(
-                "قبول العرض",
-                ignoreCase = true
-            ) ||
-            description.contains(
-                "قبول العرض",
-                ignoreCase = true
-            )
-        ) {
-            return node
-        }
-
-        for (
-            i in 0 until node.childCount
-        ) {
-
-            val result =
-                findAcceptNode(
-                    node.getChild(i)
-                )
-
-            if (result != null) {
-                return result
-            }
-        }
-
-        return null
-    }
-
-    // =============================
-    // جمع النصوص من الشاشة
-    // =============================
-
-    private fun collectTexts(
-        node: AccessibilityNodeInfo?,
-        result: MutableList<String>
-    ) {
-
-        if (node == null) {
-            return
-        }
-
-        val text =
-            node.text
-                ?.toString()
-                ?.trim()
-
-        if (
-            !text.isNullOrEmpty()
-        ) {
-            result.add(text)
-        }
-
-        val description =
-            node.contentDescription
-                ?.toString()
-                ?.trim()
-
-        if (
-            !description.isNullOrEmpty() &&
-            !result.contains(description)
-        ) {
-            result.add(description)
-        }
-
-        for (
-            i in 0 until node.childCount
-        ) {
-
-            collectTexts(
-                node.getChild(i),
-                result
-            )
+            /*
+             * مهم:
+             * في هذه المرحلة لا نضغط تلقائياً.
+             *
+             * أولاً سنقرأ:
+             * 1. السعر
+             * 2. الوقت
+             * 3. نتأكد أن التطبيق Jeeny
+             * 4. نطبق الفلاتر
+             *
+             * وبعدها فقط نستدعي:
+             *
+             * clickAcceptOffer(root)
+             */
         }
     }
 
-    // =============================
-    // استخراج السعر
-    // =============================
+    /*
+     * الضغط على زر قبول العرض
+     *
+     * نبحث عن النص "قبول العرض".
+     * إذا كان العنصر نفسه Clickable نضغطه.
+     *
+     * إذا لم يكن Clickable نصعد إلى Parent
+     * حتى نجد العنصر القابل للنقر.
+     */
+    private fun clickAcceptOffer(
+        root: AccessibilityNodeInfo
+    ): Boolean {
 
-    private fun extractPrice(
-        texts: List<String>
-    ): Double? {
+        val nodes =
+            root.findAccessibilityNodeInfosByText("قبول العرض")
 
-        val regexes =
-            listOf(
+        if (nodes.isNullOrEmpty()) {
+            Log.d(TAG, "Accept button not found")
+            return false
+        }
 
-                Regex(
-                    """JOD\s*([0-9]+(?:[.,][0-9]+)?)""",
-                    RegexOption.IGNORE_CASE
-                ),
+        for (node in nodes) {
 
-                Regex(
-                    """([0-9]+(?:[.,][0-9]+)?)\s*JOD""",
-                    RegexOption.IGNORE_CASE
-                )
-            )
+            var current: AccessibilityNodeInfo? = node
 
-        for (text in texts) {
+            while (current != null) {
 
-            for (regex in regexes) {
+                if (current.isClickable) {
 
-                val match =
-                    regex.find(text)
-                        ?: continue
-
-                val value =
-                    match
-                        .groupValues[1]
-                        .replace(
-                            ",",
-                            "."
+                    val clicked =
+                        current.performAction(
+                            AccessibilityNodeInfo.ACTION_CLICK
                         )
 
-                val price =
-                    value.toDoubleOrNull()
+                    Log.d(
+                        TAG,
+                        "Accept button click result: $clicked"
+                    )
 
-                if (price != null) {
-                    return price
+                    return clicked
                 }
+
+                current = current.parent
             }
         }
 
-        return null
-    }
+        Log.d(TAG, "Clickable parent not found")
 
-    // =============================
-    // استخراج الدقائق
-    // =============================
-
-    private fun extractMinutes(
-        texts: List<String>
-    ): Int? {
-
-        val regexes =
-            listOf(
-
-                Regex(
-                    """يبعد\s*([0-9]+)\s*دقائق?"""
-                ),
-
-                Regex(
-                    """([0-9]+)\s*دقائق?"""
-                ),
-
-                Regex(
-                    """([0-9]+)\s*دقيقة"""
-                )
-            )
-
-        for (text in texts) {
-
-            for (regex in regexes) {
-
-                val match =
-                    regex.find(text)
-                        ?: continue
-
-                val minutes =
-                    match
-                        .groupValues[1]
-                        .toIntOrNull()
-
-                if (minutes != null) {
-                    return minutes
-                }
-            }
-        }
-
-        return null
+        return false
     }
 
     override fun onInterrupt() {
-
-        Log.d(
-            TAG,
-            "RideClick Accessibility interrupted"
-        )
+        Log.d(TAG, "RideClick Accessibility interrupted")
     }
 }

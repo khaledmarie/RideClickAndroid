@@ -9,103 +9,72 @@ class RideClickAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "RideClick"
+
+        const val ACTION_OFFER_UPDATE =
+            "com.rideclick.app.ACTION_OFFER_UPDATE"
+
+        const val EXTRA_PLATFORM = "platform"
+        const val EXTRA_PRICE = "price"
+        const val EXTRA_MINUTES = "minutes"
+        const val EXTRA_DISTANCE = "distance"
+        const val EXTRA_MATCHED = "matched"
+        const val EXTRA_ACCEPT_FOUND = "accept_found"
+        const val EXTRA_MIN_PRICE = "min_price"
+        const val EXTRA_MAX_MINUTES = "max_minutes"
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        Log.d(TAG, "RideClick Accessibility Service connected")
+
+        Log.d(
+            TAG,
+            "RideClick Accessibility Service connected"
+        )
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-
+    override fun onAccessibilityEvent(
+        event: AccessibilityEvent?
+    ) {
         if (event == null) return
 
         val root = rootInActiveWindow ?: return
 
-        // حالياً نقرأ الشاشة فقط
-        // لاحقاً سنربطها بفلاتر السعر والوقت
-        inspectScreen(root)
+        try {
+            inspectScreen(root)
+        } catch (exception: RuntimeException) {
+            Log.e(
+                TAG,
+                "Unable to inspect screen",
+                exception
+            )
+        }
     }
 
-    private fun inspectScreen(root: AccessibilityNodeInfo) {
-
-        // البحث عن زر قبول العرض في Jeeny
+    private fun inspectScreen(
+        root: AccessibilityNodeInfo
+    ) {
         val acceptNodes =
-            root.findAccessibilityNodeInfosByText("قبول العرض")
+            root.findAccessibilityNodeInfosByText(
+                "قبول العرض"
+            )
 
         if (!acceptNodes.isNullOrEmpty()) {
-
-            Log.d(TAG, "Jeeny offer detected")
-
-            /*
-             * مهم:
-             * في هذه المرحلة لا نضغط تلقائياً.
-             *
-             * أولاً سنقرأ:
-             * 1. السعر
-             * 2. الوقت
-             * 3. نتأكد أن التطبيق Jeeny
-             * 4. نطبق الفلاتر
-             *
-             * وبعدها فقط نستدعي:
-             *
-             * clickAcceptOffer(root)
-             */
-        }
-    }
-
-    /*
-     * الضغط على زر قبول العرض
-     *
-     * نبحث عن النص "قبول العرض".
-     * إذا كان العنصر نفسه Clickable نضغطه.
-     *
-     * إذا لم يكن Clickable نصعد إلى Parent
-     * حتى نجد العنصر القابل للنقر.
-     */
-    private fun clickAcceptOffer(
-        root: AccessibilityNodeInfo
-    ): Boolean {
-
-        val nodes =
-            root.findAccessibilityNodeInfosByText("قبول العرض")
-
-        if (nodes.isNullOrEmpty()) {
-            Log.d(TAG, "Accept button not found")
-            return false
+            Log.d(
+                TAG,
+                "Offer text detected in package: " +
+                    root.packageName
+            )
         }
 
-        for (node in nodes) {
-
-            var current: AccessibilityNodeInfo? = node
-
-            while (current != null) {
-
-                if (current.isClickable) {
-
-                    val clicked =
-                        current.performAction(
-                            AccessibilityNodeInfo.ACTION_CLICK
-                        )
-
-                    Log.d(
-                        TAG,
-                        "Accept button click result: $clicked"
-                    )
-
-                    return clicked
-                }
-
-                current = current.parent
-            }
-        }
-
-        Log.d(TAG, "Clickable parent not found")
-
-        return false
+        // هذه النسخة لا تضغط على زر القبول.
+        // قراءة السعر والوقت وتطبيق الفلاتر
+        // تحتاج ربط ملفات المرحلة الثانية.
     }
 
     override fun onInterrupt() {
-        Log.d(TAG, "RideClick Accessibility interrupted")
+        Log.d(
+            TAG,
+            "RideClick Accessibility interrupted"
+        )
     }
 }

@@ -2,7 +2,11 @@ package com.rideclick.app
 
 object TextRequestParser {
     private val money = Regex("""(?i)(?:د\.?أ|دينار|JOD)\s*([0-9]+(?:[.,][0-9]+)?)|([0-9]+(?:[.,][0-9]+)?)\s*(?:د\.?أ|دينار|JOD)""")
-    private val minutes = Regex("""([0-9]+)\s*(?:دقيقة|دقائق|د|min|mins)""", RegexOption.IGNORE_CASE)
+    // Match a complete integer and minute unit, excluding decimal tails and Arabic currency.
+    private val minutes = Regex(
+        """(?<![\p{L}\p{N}.,])([0-9]+)\s*(?:دقيقة|دقائق|د(?!\s*[.أ])|minutes?|mins?)(?![\p{L}\p{N}])""",
+        RegexOption.IGNORE_CASE
+    )
     private val km = Regex("""([0-9]+(?:[.,][0-9]+)?)\s*(?:كم|km)""", RegexOption.IGNORE_CASE)
 
     fun parse(text: String, platform: Platform): RideRequest? {

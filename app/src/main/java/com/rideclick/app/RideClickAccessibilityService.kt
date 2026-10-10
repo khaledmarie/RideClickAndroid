@@ -1,6 +1,9 @@
 package com.rideclick.app
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.graphics.Path
+import android.os.SystemClock
 import android.content.Context
 import android.graphics.Rect
 import android.util.Log
@@ -42,7 +45,8 @@ class RideClickAccessibilityService : AccessibilityService() {
         private const val CLICK_COOLDOWN_MS = 3000L
     }
 
-    private var lastClickTime = 0L
+    private var lastClickTime = -CLICK_COOLDOWN_MS
+    private var gestureInFlight = false
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -78,6 +82,9 @@ class RideClickAccessibilityService : AccessibilityService() {
         // ==========================================
         // 1. قراءة كل النصوص الظاهرة على الشاشة
         // ==========================================
+
+        val sourcePackage = root.packageName?.toString()?.lowercase() ?: return
+        if (!(sourcePackage.contains("jeeny") || sourcePackage.contains("easytaxi") || sourcePackage.contains("petra"))) return
 
         val texts = mutableListOf<String>()
 
@@ -229,7 +236,7 @@ class RideClickAccessibilityService : AccessibilityService() {
                 ?.trim()
 
         if (!text.isNullOrEmpty()) {
-            result.add(text)
+            result.add(normalizeScreenText(text))
         }
 
         val description =
@@ -241,7 +248,7 @@ class RideClickAccessibilityService : AccessibilityService() {
             !description.isNullOrEmpty() &&
             description != text
         ) {
-            result.add(description)
+            result.add(normalizeScreenText(description))
         }
 
         for (i in 0 until node.childCount) {
@@ -523,7 +530,7 @@ class RideClickAccessibilityService : AccessibilityService() {
 
             packageNameText.contains(
                 "jeeny"
-            ) -> "Jeeny"
+            ) || packageNameText.contains("easytaxi") -> "Jeeny"
 
             packageNameText.contains(
                 "petra"
@@ -537,198 +544,95 @@ class RideClickAccessibilityService : AccessibilityService() {
     // هل يوجد عنصر قبول؟
     // ==============================================
 
-    private fun hasAcceptNode(
-        root: AccessibilityNodeInfo
-    ): Boolean {
+    private fun hasAcceptNode(root: AccessibilityNodeInfo): Boolean =
+        findAcceptTarget(root) != null
 
-        val possibleTexts =
-            listOf(
-                "قبول العرض",
-                "قبول",
-                "Accept"
-            )
-
-        for (text in possibleTexts) {
-
-            val nodes =
-                root.findAccessibilityNodeInfosByText(
-                    text
-                )
-
-            if (!nodes.isNullOrEmpty()) {
-                return true
-            }
-        }
-
-        return false
-    }
-
-    // ==============================================
-    // البحث عن القبول والضغط عليه
-    // ==============================================
-
-    private fun findAndClickAccept(
-        root: AccessibilityNodeInfo
-    ) {
-
-        val now =
-            System.currentTimeMillis()
-
-        // حماية من تكرار الضغط
-        if (
-            now - lastClickTime <
-            CLICK_COOLDOWN_MS
-        ) {
-
-            Log.d(
-                TAG,
-                "Click ignored because of cooldown"
-            )
-
-            return
-        }
-
-        val possibleTexts =
-            listOf(
-                "قبول العرض",
-                "قبول",
-                "Accept"
-            )
-
-        for (acceptText in possibleTexts) {
-
-            val nodes =
-                root.findAccessibilityNodeInfosByText(
-                    acceptText
-                )
-
-            if (nodes.isNullOrEmpty()) {
-                continue
-            }
-
-            for (node in nodes) {
-
-                val clickableNode =
-                    findClickableParent(node)
-
-                if (clickableNode != null) {
-
-                    // علامة تشخيصية فقط:
-                    // نأخذ مركز العنصر الذي سنطلب من Accessibility الضغط عليه
-                    // ونرسل موقعه إلى Overlay ليظهر دائرة حمراء لمدة ثانية.
-                    val bounds = Rect()
-                    clickableNode.getBoundsInScreen(bounds)
-
-                    if (!bounds.isEmpty) {
-                        sendClickMarker(
-                            x = bounds.centerX(),
-                            y = bounds.centerY()
-                        )
-                    }
-
-                    val success =
-                        clickableNode.performAction(
-                            AccessibilityNodeInfo.ACTION_CLICK
-                        )
-
-                    if (success) {
-
-                        lastClickTime = now
-
-                        Log.d(
-                            TAG,
-                            "Jeeny accept click SUCCESS"
-                        )
-
-                        return
-                    }
+    // Identify the visible offer control by text AND content description.
+    // Use its actual bounds; never guess a fixed bottom-screen coordinate.
+    private fun findAcceptTarget(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val label = normalizeScreenText(
+            "${node.text ?: ""} ${node.contentDescription ?: ""}"
+        ).lowercase()
+        if (node.isVisibleToUser && node.isEnabled &&
+            (label.contains("قبول العرض") || label.contains("accept offer") ||
+                label.trim() == "قبول" || label.trim() == "accept") &&
+            !label.contains("رفض") && !label.contains("reject")) {
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            if (bounds.width() >= 40 && bounds.height() >= 20) {
+                var current: AccessibilityNodeInfo? = node
+                repeat(4) {
+                    val candidate = current ?: return@repeat
+                    if (candidate.isVisibleToUser && candidate.isEnabled &&
+                        candidate.isClickable && candidate.parent != null) return candidate
+                    current = candidate.parent
                 }
+                return node
             }
         }
-
-        Log.d(
-            TAG,
-            "Matching offer detected, " +
-                "but clickable accept node was not found"
-        )
-    }
-
-    // ==============================================
-    // إرسال مكان محاولة الضغط إلى Overlay
-    // ==============================================
-
-    private fun sendClickMarker(
-        x: Int,
-        y: Int
-    ) {
-
-        try {
-
-            val intent =
-                android.content.Intent(
-                    ACTION_CLICK_MARKER
-                ).apply {
-
-                    setPackage(packageName)
-
-                    putExtra(
-                        EXTRA_CLICK_X,
-                        x
-                    )
-
-                    putExtra(
-                        EXTRA_CLICK_Y,
-                        y
-                    )
-                }
-
-            sendBroadcast(intent)
-
-            Log.d(
-                TAG,
-                "Click marker sent at x=$x, y=$y"
-            )
-
-        } catch (e: Exception) {
-
-            Log.e(
-                TAG,
-                "Unable to send click marker",
-                e
-            )
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val target = findAcceptTarget(child)
+            if (target != null) return target
         }
-    }
-
-    // ==============================================
-    // أحياناً النص نفسه ليس Clickable
-    // لذلك نصعد إلى الأب حتى نجد العنصر القابل للنقر
-    // ==============================================
-
-    private fun findClickableParent(
-        node: AccessibilityNodeInfo?
-    ): AccessibilityNodeInfo? {
-
-        var current =
-            node
-
-        while (current != null) {
-
-            if (current.isClickable) {
-                return current
-            }
-
-            current =
-                current.parent
-        }
-
         return null
     }
 
-    override fun onInterrupt() {
-
-        Log.d(
-            TAG,
-            "RideClick Accessibility interrupted"
-        )
+    private fun findAndClickAccept(root: AccessibilityNodeInfo) {
+        val now = SystemClock.elapsedRealtime()
+        if (gestureInFlight || now - lastClickTime < CLICK_COOLDOWN_MS) return
+        val target = findAcceptTarget(root)
+        if (target == null) {
+            Log.d(TAG, "Matching offer, but no visible accept control")
+            return
+        }
+        val bounds = Rect()
+        target.getBoundsInScreen(bounds)
+        if (bounds.isEmpty) return
+        val x = bounds.centerX()
+        val y = bounds.centerY()
+        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0L, 60L))
+            .build()
+        gestureInFlight = true
+        lastClickTime = now
+        try {
+            val queued = dispatchGesture(gesture, object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription?) {
+                    gestureInFlight = false
+                    // Show the marker AFTER the touch so it cannot obstruct it.
+                    sendClickMarker(x, y)
+                    Log.d(TAG, "Accept gesture completed at x=$x y=$y; acceptance requires screen verification")
+                }
+                override fun onCancelled(gestureDescription: GestureDescription?) {
+                    gestureInFlight = false
+                    sendClickMarker(x, y)
+                    Log.w(TAG, "Accept gesture cancelled at x=$x y=$y")
+                }
+            }, null)
+            if (!queued) {
+                gestureInFlight = false
+                sendClickMarker(x, y)
+                Log.w(TAG, "Accept gesture was rejected by Android")
+            }
+        } catch (e: Exception) {
+            gestureInFlight = false
+            Log.e(TAG, "Unable to dispatch accept gesture", e)
+        }
     }
+
+    private fun normalizeScreenText(value: String): String =
+        value.map { c ->
+            when (c) {
+                in '٠'..'٩' -> ('0'.code + c.code - '٠'.code).toChar()
+                in '۰'..'۹' -> ('0'.code + c.code - '۰'.code).toChar()
+                '٫' -> '.'
+                else -> c
+            }
+        }.joinToString("")
+            .replace("ـ", "")
+            .replace(Regex("[\\u0610-\\u061A\\u064B-\\u065F\\u0670\\u06D6-\\u06ED\\u200E\\u200F]"), "")
+            .replace(Regex("\\s+"), " ").trim()
+
 }

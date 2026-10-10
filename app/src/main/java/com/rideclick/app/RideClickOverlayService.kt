@@ -763,8 +763,9 @@ class RideClickOverlayService : Service() {
                 PixelFormat.TRANSLUCENT
             ).apply {
 
+                alpha = 0.5f
                 gravity =
-                    Gravity.TOP or Gravity.START
+                    Gravity.TOP or Gravity.LEFT
 
                 x =
                     screenX -

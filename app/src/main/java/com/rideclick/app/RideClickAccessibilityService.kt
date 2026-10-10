@@ -622,6 +622,25 @@ class RideClickAccessibilityService : AccessibilityService() {
         }
     }
 
+
+    override fun onInterrupt() {
+        gestureInFlight = false
+        Log.d(TAG, "RideClick Accessibility Service interrupted")
+    }
+
+    private fun sendClickMarker(x: Int, y: Int) {
+        try {
+            val intent = android.content.Intent(ACTION_CLICK_MARKER).apply {
+                setPackage(packageName)
+                putExtra(EXTRA_CLICK_X, x)
+                putExtra(EXTRA_CLICK_Y, y)
+            }
+            sendBroadcast(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Unable to send click marker", e)
+        }
+    }
+
     private fun normalizeScreenText(value: String): String =
         value.map { c ->
             when (c) {
